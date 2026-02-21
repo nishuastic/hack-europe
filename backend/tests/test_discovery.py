@@ -85,30 +85,49 @@ async def test_exec_search_companies(mock_get_client):
     mock_client.async_search = AsyncMock(return_value=mock_response)
     mock_get_client.return_value = mock_client
 
-    result = await _exec_search_companies("fintech startups", "standard", set())
+    product_id, result = await _exec_search_companies("fintech startups", "standard", 1)
+    assert product_id == 1
     assert len(result["companies"]) == 2
     assert result["companies"][0]["name"] == "Acme Corp"
 
 
 @pytest.mark.asyncio
+@patch("backend.discovery.icp_agent._plan_discovery_queries")
 @patch("backend.discovery.icp_agent._get_client")
-async def test_exec_search_companies_excludes_urls(mock_get_client):
-    from backend.discovery.icp_agent import _exec_search_companies
+async def test_search_all_products_multi_product_mapping(mock_get_client, mock_plan):
+    """When two product searches return the same URL, the candidate has both product IDs."""
+    from backend.discovery.icp_agent import _search_all_products
+
+    # Return no planned queries so fallback is used
+    mock_plan.return_value = []
 
     mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.output = {
-        "companies": [
-            {"name": "Acme Corp", "url": "https://acme.com", "description": "A corp", "industry": "Tech"},
-            {"name": "Beta Inc", "url": "https://beta.com", "description": "B corp", "industry": "Finance"},
-        ],
-    }
-    mock_client.async_search = AsyncMock(return_value=mock_response)
+
+    # Both searches return the same company URL
+    async def fake_search(**kwargs):
+        resp = MagicMock()
+        resp.output = {
+            "companies": [
+                {"name": "Acme Corp", "url": "https://acme.com", "description": "A corp", "industry": "Tech"},
+            ],
+        }
+        return resp
+
+    mock_client.async_search = AsyncMock(side_effect=fake_search)
     mock_get_client.return_value = mock_client
 
-    result = await _exec_search_companies("fintech startups", "standard", {"https://acme.com"})
-    assert len(result["companies"]) == 1
-    assert result["companies"][0]["name"] == "Beta Inc"
+    product_a = _make_product(id=1, name="Product A", description="First product", industry_focus="Tech")
+    product_b = _make_product(id=2, name="Product B", description="Second product", industry_focus="Finance")
+
+    candidates = await _search_all_products([product_a, product_b])
+
+    # Should have exactly one candidate (merged), with both product IDs
+    acme_candidates = [c for c in candidates if c.get("url") == "https://acme.com"]
+    assert len(acme_candidates) == 1
+    assert 1 in acme_candidates[0]["matched_product_ids"]
+    assert 2 in acme_candidates[0]["matched_product_ids"]
+    assert "Product A" in acme_candidates[0]["matched_product_names"]
+    assert "Product B" in acme_candidates[0]["matched_product_names"]
 
 
 # ─── Discovery pipeline integration tests ────────────────────────────────

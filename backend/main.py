@@ -184,6 +184,7 @@ async def refresh_token(body: RefreshTokenRequest, session: AsyncSession = Depen
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
+    assert user.id is not None
     access = create_access_token(user.id, user.email)
     return {"access_token": access, "token_type": "bearer"}
 
@@ -347,6 +348,7 @@ async def upsert_company_profile(
 @app.post("/api/discovery/run")
 async def run_discovery_endpoint(body: DiscoveryRequest, user: User = Depends(get_current_user)):
     """Kick off ICP-based company discovery. Fire-and-forget async pipeline."""
+    assert user.id is not None
     asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager, user.id))
     return {
         "status": "discovery_started",
@@ -627,6 +629,7 @@ async def get_analytics_endpoint(session: AsyncSession = Depends(get_session), u
     """Get analytics dashboard data."""
     from backend.analytics import get_analytics
 
+    assert user.id is not None
     return await get_analytics(session, user.id)
 
 
@@ -635,6 +638,7 @@ async def trigger_predictions(session: AsyncSession = Depends(get_session), user
     """Predict conversion likelihood for matches missing predictions."""
     from backend.analytics import predict_conversions
 
+    assert user.id is not None
     asyncio.create_task(predict_conversions(manager, session, user.id))
     return {"status": "prediction_started"}
 
