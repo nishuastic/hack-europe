@@ -162,7 +162,7 @@ hack-europe/
 | `ANTHROPIC_API_KEY` | Yes | Claude API key for AI extraction + generation |
 | `LINKUP_API_KEY` | Yes | LinkUp API key for web research |
 | `ELEVENLABS_API_KEY` | Later | ElevenLabs key for voice briefings |
-| `STRIPE_SECRET_KEY` | Later | Stripe test key for billing |
+| `STRIPE_API_KEY` | Later | Stripe test key for billing |
 
 ## Architecture
 
