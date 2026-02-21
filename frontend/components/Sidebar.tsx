@@ -1,6 +1,7 @@
 "use client";
 
 import { AppView } from "@/lib/types";
+import { useAuth } from "./AuthContext";
 
 interface SidebarProps {
   view: AppView;
@@ -8,6 +9,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ view, setView }: SidebarProps) {
+  const { user } = useAuth();
   const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
     { icon: "dashboard", label: "Dashboard", page: "dashboard" },
     { icon: "inventory_2", label: "Products", page: "products" },
@@ -87,13 +89,10 @@ export default function Sidebar({ view, setView }: SidebarProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-slate-900 truncate">
-              Acme Admin
+              {user?.name || "User"}
             </p>
-            <p className="text-xs text-slate-500 truncate">admin@acme.io</p>
+            <p className="text-xs text-slate-500 truncate">{user?.email}</p>
           </div>
-          <span className="material-symbols-outlined text-gray-700 text-[18px]">
-            more_vert
-          </span>
         </button>
       </div>
     </aside>

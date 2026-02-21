@@ -115,6 +115,8 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   const fetchLeads = () => {
     api
@@ -202,9 +204,11 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
     }
   };
 
-  const filtered = leads.filter((l) =>
-    l.company_name.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = leads.filter((l) => {
+    const matchesSearch = l.company_name.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === "all" || l.enrichment_status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
@@ -215,16 +219,58 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
             Leads &amp; Enrichment
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
-            Track enrichment status and AI match scores.
+            Track enrichment status and leads.
           </p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">
-              filter_list
-            </span>
-            Filter
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2 ${showFilters ? 'bg-slate-50 border-slate-300' : ''}`}
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                filter_list
+              </span>
+              Filter
+              {statusFilter !== "all" && (
+                <span className="w-2 h-2 bg-primary rounded-full"></span>
+              )}
+            </button>
+            {showFilters && (
+              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1">
+                <button
+                  onClick={() => { setStatusFilter("all"); setShowFilters(false); }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "all" ? "bg-slate-100 font-medium" : ""}`}
+                >
+                  All Status
+                </button>
+                <button
+                  onClick={() => { setStatusFilter("pending"); setShowFilters(false); }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "pending" ? "bg-slate-100 font-medium" : ""}`}
+                >
+                  Pending
+                </button>
+                <button
+                  onClick={() => { setStatusFilter("in_progress"); setShowFilters(false); }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "in_progress" ? "bg-slate-100 font-medium" : ""}`}
+                >
+                  In Progress
+                </button>
+                <button
+                  onClick={() => { setStatusFilter("complete"); setShowFilters(false); }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "complete" ? "bg-slate-100 font-medium" : ""}`}
+                >
+                  Complete
+                </button>
+                <button
+                  onClick={() => { setStatusFilter("failed"); setShowFilters(false); }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "failed" ? "bg-slate-100 font-medium" : ""}`}
+                >
+                  Failed
+                </button>
+              </div>
+            )}
+          </div>
           <button
             onClick={handleGenerate}
             disabled={generating}
@@ -255,19 +301,13 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
             placeholder="Search companies..."
           />
         </div>
-        <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto px-2">
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors whitespace-nowrap">
-            <span>Match Score</span>
-            <span className="material-symbols-outlined text-[16px] text-slate-400">
-              arrow_downward
+        <div className="flex items-center gap-2 w-full lg:w-auto">
+          {statusFilter !== "all" && (
+            <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
+              Status: {statusFilter.replace("_", " ")}
+              <button onClick={() => setStatusFilter("all")} className="ml-1 hover:text-slate-700">×</button>
             </span>
-          </button>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors whitespace-nowrap">
-            <span>Status</span>
-            <span className="material-symbols-outlined text-[16px] text-slate-400">
-              expand_more
-            </span>
-          </button>
+          )}
         </div>
       </div>
 
@@ -282,7 +322,6 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
                   "Industry",
                   "Employees",
                   "Revenue",
-                  "Match",
                   "Status",
                   "Assets",
                 ].map((h, i) => (
@@ -357,25 +396,6 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
                     </td>
                     <td className="px-6 py-3.5 whitespace-nowrap text-sm text-slate-500">
                       {lead.revenue || "-"}
-                    </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap">
-                      {lead.best_match_score ? (
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-medium text-slate-700 w-6 text-right">
-                            {lead.best_match_score.toFixed(1)}
-                          </span>
-                          <div className="w-16 bg-slate-100 rounded-full h-1 overflow-hidden">
-                            <div
-                              className={`${barColor(lead.best_match_score)} h-1 rounded-full`}
-                              style={{
-                                width: `${lead.best_match_score * 10}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-slate-400">-</span>
-                      )}
                     </td>
                     <td className="px-6 py-3.5 whitespace-nowrap">
                       <div className="flex items-center gap-2">

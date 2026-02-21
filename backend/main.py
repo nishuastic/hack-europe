@@ -11,7 +11,6 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-<<<<<<< HEAD
 from backend.auth import (
     create_access_token,
     create_refresh_token,
@@ -19,11 +18,19 @@ from backend.auth import (
     hash_password,
     verify_password,
 )
-=======
->>>>>>> 8396847e04749784afcbaee03385dc7c4f63beb2
 from backend.db import get_session, init_db
+from backend.discovery.discovery_pipeline import run_discovery
 from backend.enrichment.pipeline import enrich_lead, enrich_leads
-from backend.models import EnrichmentStatus, Lead, Product
+from backend.models import (
+    CompanyProfile,
+    EnrichmentStatus,
+    GeneratedEmail,
+    Lead,
+    PitchDeck,
+    Product,
+    ProductMatch,
+    User,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -205,6 +212,19 @@ class LeadImport(BaseModel):
     companies: list[str]
 
 
+class CompanyProfileUpdate(BaseModel):
+    company_name: str | None = None
+    website: str | None = None
+    growth_stage: str | None = None
+    geography: str | None = None
+    value_proposition: str | None = None
+
+
+class DiscoveryRequest(BaseModel):
+    product_ids: list[int] | None = None
+    max_companies: int = 20
+
+
 # ─── Product CRUD ─────────────────────────────────────────────────────
 
 @app.post("/api/products")
@@ -273,7 +293,6 @@ async def delete_product(
     return {"deleted": True}
 
 
-<<<<<<< HEAD
 # ─── Company Profile ──────────────────────────────────────────────────
 
 
@@ -286,12 +305,12 @@ async def get_company_profile(session: AsyncSession = Depends(get_session), user
 
 @app.put("/api/company-profile")
 async def upsert_company_profile(
-    body: CompanyProfileUpsert, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+    body: CompanyProfileUpdate, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
 ):
     result = await session.execute(select(CompanyProfile).where(CompanyProfile.user_id == user.id))
     profile = result.scalar_one_or_none()
     if profile:
-        for field, value in body.model_dump().items():
+        for field, value in body.model_dump(exclude_unset=True).items():
             setattr(profile, field, value)
     else:
         profile = CompanyProfile(**body.model_dump(), user_id=user.id)
@@ -305,17 +324,15 @@ async def upsert_company_profile(
 
 
 @app.post("/api/discovery/run")
-async def run_discovery_endpoint(body: DiscoveryRequest):
+async def run_discovery_endpoint(body: DiscoveryRequest, user: User = Depends(get_current_user)):
     """Kick off ICP-based company discovery. Fire-and-forget async pipeline."""
-    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager))
+    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager, user.id))
     return {
         "status": "discovery_started",
         "max_companies": body.max_companies,
     }
 
 
-=======
->>>>>>> 8396847e04749784afcbaee03385dc7c4f63beb2
 # ─── Lead Import + List ───────────────────────────────────────────────
 
 @app.post("/api/leads/import")
@@ -370,7 +387,6 @@ async def trigger_enrich(
     # Fire-and-forget
     asyncio.create_task(enrich_lead(lead_id, manager))
     return {"lead_id": lead_id, "status": "enrichment_started"}
-<<<<<<< HEAD
 
 
 # ─── Product Matching ─────────────────────────────────────────────────
@@ -513,20 +529,25 @@ async def create_email(
     """Generate an outreach email for a lead-product pair."""
     from backend.actions.email_generator import generate_email
 
-    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
-    product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Get match reasoning
     match_obj = (
         await session.execute(
-            select(ProductMatch).where(
+            select(ProductMatch)
+            .join(Lead)
+            .where(
                 ProductMatch.lead_id == lead_id,
                 ProductMatch.product_id == product_id,
+                Lead.user_id == user.id,
             )
         )
     ).scalar_one_or_none()
@@ -556,19 +577,17 @@ async def create_email(
 
 
 @app.get("/api/analytics")
-async def get_analytics_endpoint(session: AsyncSession = Depends(get_session)):
+async def get_analytics_endpoint(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
     """Get analytics dashboard data."""
     from backend.analytics import get_analytics
 
-    return await get_analytics(session)
+    return await get_analytics(session, user.id)
 
 
 @app.post("/api/analytics/predict")
-async def trigger_predictions(session: AsyncSession = Depends(get_session)):
+async def trigger_predictions(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
     """Predict conversion likelihood for matches missing predictions."""
     from backend.analytics import predict_conversions
 
-    asyncio.create_task(predict_conversions(manager, session))
+    asyncio.create_task(predict_conversions(manager, session, user.id))
     return {"status": "prediction_started"}
-=======
->>>>>>> 8396847e04749784afcbaee03385dc7c4f63beb2
