@@ -24,21 +24,21 @@ def _get_claude_client() -> anthropic.AsyncAnthropic:
     return _aclient
 
 
-async def get_analytics(session: AsyncSession) -> dict:
-    """Compute analytics dashboard data from SQL aggregations."""
-    # Total leads and enriched count
-    total_result = await session.execute(select(func.count(Lead.id)))  # type: ignore[arg-type]
+async def get_analytics(session: AsyncSession, user_id: int) -> dict:
+    """Compute analytics dashboard data from SQL aggregations for a specific user."""
+    # Total leads and enriched count for this user
+    total_result = await session.execute(select(func.count(Lead.id)).where(Lead.user_id == user_id))  # type: ignore[arg-type]
     total_leads = total_result.scalar() or 0
 
     enriched_result = await session.execute(
-        select(func.count(Lead.id)).where(Lead.enrichment_status == "complete")  # type: ignore[arg-type]
+        select(func.count(Lead.id)).where(Lead.enrichment_status == "complete", Lead.user_id == user_id)  # type: ignore[arg-type]
     )
     enriched_count = enriched_result.scalar() or 0
 
     # Industry breakdown
     industry_rows = await session.execute(
         select(Lead.industry, func.count(Lead.id))  # type: ignore[arg-type]
-        .where(Lead.industry.isnot(None))  # type: ignore[union-attr]
+        .where(Lead.industry.isnot(None), Lead.user_id == user_id)  # type: ignore[union-attr]
         .group_by(Lead.industry)
     )
     industry_breakdown = {row[0]: row[1] for row in industry_rows.all()}
@@ -47,6 +47,8 @@ async def get_analytics(session: AsyncSession) -> dict:
     avg_score_rows = await session.execute(
         select(Product.name, func.avg(ProductMatch.match_score))
         .join(Product, Product.id == ProductMatch.product_id)  # type: ignore[arg-type]
+        .join(Lead, Lead.id == ProductMatch.lead_id)  # type: ignore[arg-type]
+        .where(Lead.user_id == user_id)
         .group_by(Product.name)
     )
     avg_match_score_by_product = {row[0]: round(float(row[1]), 2) for row in avg_score_rows.all()}
@@ -56,6 +58,7 @@ async def get_analytics(session: AsyncSession) -> dict:
         select(ProductMatch, Lead.company_name, Product.name)
         .join(Lead, Lead.id == ProductMatch.lead_id)  # type: ignore[arg-type]
         .join(Product, Product.id == ProductMatch.product_id)  # type: ignore[arg-type]
+        .where(Lead.user_id == user_id)
         .order_by(ProductMatch.match_score.desc())  # type: ignore[attr-defined]
         .limit(5)
     )
@@ -74,7 +77,7 @@ async def get_analytics(session: AsyncSession) -> dict:
     # Buying signal frequency — count signals across all leads
     signal_frequency: dict[str, int] = {}
     leads_with_signals = await session.execute(
-        select(Lead.buying_signals).where(Lead.buying_signals.isnot(None))  # type: ignore[union-attr]
+        select(Lead.buying_signals).where(Lead.buying_signals.isnot(None), Lead.user_id == user_id)  # type: ignore[union-attr]
     )
     for (signals_raw,) in leads_with_signals.all():
         if not signals_raw:
@@ -86,7 +89,11 @@ async def get_analytics(session: AsyncSession) -> dict:
 
     # Score distribution buckets
     score_dist: dict[str, int] = {"1-3": 0, "4-6": 0, "7-10": 0}
-    all_scores = await session.execute(select(ProductMatch.match_score))
+    all_scores = await session.execute(
+        select(ProductMatch.match_score)
+        .join(Lead, Lead.id == ProductMatch.lead_id)  # type: ignore[arg-type]
+        .where(Lead.user_id == user_id)
+    )
     for (score,) in all_scores.all():
         if score <= 3:
             score_dist["1-3"] += 1
@@ -106,13 +113,13 @@ async def get_analytics(session: AsyncSession) -> dict:
     }
 
 
-async def predict_conversions(ws_manager, session: AsyncSession) -> None:
-    """Use Claude to predict conversion likelihood for matches missing it."""
+async def predict_conversions(ws_manager, session: AsyncSession, user_id: int) -> None:
+    """Use Claude to predict conversion likelihood for matches missing it for a specific user."""
     matches_result = await session.execute(
         select(ProductMatch, Lead, Product)
         .join(Lead, Lead.id == ProductMatch.lead_id)  # type: ignore[arg-type]
         .join(Product, Product.id == ProductMatch.product_id)  # type: ignore[arg-type]
-        .where(ProductMatch.conversion_likelihood.is_(None))  # type: ignore[union-attr]
+        .where(ProductMatch.conversion_likelihood.is_(None), Lead.user_id == user_id)  # type: ignore[union-attr]
     )
     rows = matches_result.all()
     if not rows:

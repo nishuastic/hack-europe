@@ -1,5 +1,18 @@
 const API_BASE = "http://localhost:8000";
 
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  user: User;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -88,6 +101,150 @@ export type WSMessage =
 class ApiClient {
   private ws: WebSocket | null = null;
   private wsHandlers: Set<WebSocketMessageHandler> = new Set();
+  private accessToken: string | null = null;
+  private refreshToken: string | null = null;
+  private user: User | null = null;
+
+  constructor() {
+    // Load tokens from localStorage on init
+    if (typeof window !== "undefined") {
+      this.accessToken = localStorage.getItem("access_token");
+      this.refreshToken = localStorage.getItem("refresh_token");
+      const userStr = localStorage.getItem("user");
+      if (userStr) {
+        this.user = JSON.parse(userStr);
+      }
+    }
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.accessToken;
+  }
+
+  getUser(): User | null {
+    return this.user;
+  }
+
+  logout() {
+    this.accessToken = null;
+    this.refreshToken = null;
+    this.user = null;
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+    }
+  }
+
+  private async refreshTokenIfNeeded(): Promise<boolean> {
+    if (!this.refreshToken) return false;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh_token: this.refreshToken }),
+      });
+
+      if (!res.ok) {
+        this.logout();
+        return false;
+      }
+
+      const data = await res.json();
+      this.setTokens(data.access_token, this.refreshToken!);
+      return true;
+    } catch {
+      this.logout();
+      return false;
+    }
+  }
+
+  setTokens(access: string, refresh: string, user?: User) {
+    this.accessToken = access;
+    this.refreshToken = refresh;
+    if (user) this.user = user;
+
+    if (typeof window !== "undefined") {
+      localStorage.setItem("access_token", access);
+      localStorage.setItem("refresh_token", refresh);
+      if (user) localStorage.setItem("user", JSON.stringify(user));
+    }
+  }
+
+  private async fetchWithAuth(
+    url: string,
+    options: RequestInit = {},
+  ): Promise<Response> {
+    const headers: Record<string, string> = {
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (this.accessToken) {
+      headers["Authorization"] = `Bearer ${this.accessToken}`;
+    }
+
+    let res = await fetch(url, { ...options, headers });
+
+    // If 401, try to refresh token and retry once
+    if (res.status === 401 && this.refreshToken) {
+      const refreshed = await this.refreshTokenIfNeeded();
+      if (refreshed) {
+        headers["Authorization"] = `Bearer ${this.accessToken!}`;
+        res = await fetch(url, { ...options, headers });
+      }
+    }
+
+    return res;
+  }
+
+  async login(email: string, password: string): Promise<AuthResponse> {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || "Login failed");
+    }
+
+    const data: AuthResponse = await res.json();
+    this.setTokens(data.access_token, data.refresh_token, data.user);
+    return data;
+  }
+
+  async register(
+    email: string,
+    password: string,
+    name: string,
+  ): Promise<AuthResponse> {
+    const res = await fetch(`${API_BASE}/api/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, name }),
+    });
+
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || "Registration failed");
+    }
+
+    const data: AuthResponse = await res.json();
+    this.setTokens(data.access_token, data.refresh_token, data.user);
+    return data;
+  }
+
+  async getCurrentUser(): Promise<User | null> {
+    try {
+      const res = await this.fetchWithAuth(`${API_BASE}/api/auth/me`);
+      if (!res.ok) return null;
+      return res.json();
+    } catch {
+      return null;
+    }
+  }
 
   connectWebSocket() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
@@ -123,13 +280,13 @@ class ApiClient {
   }
 
   async getProducts(): Promise<Product[]> {
-    const res = await fetch(`${API_BASE}/api/products`);
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products`);
     const data = await res.json();
     return data.products;
   }
 
   async createProduct(product: Omit<Product, "id">): Promise<Product> {
-    const res = await fetch(`${API_BASE}/api/products`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ products: [product] }),
@@ -139,7 +296,7 @@ class ApiClient {
   }
 
   async updateProduct(id: number, product: Partial<Product>): Promise<Product> {
-    const res = await fetch(`${API_BASE}/api/products/${id}`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(product),
@@ -148,11 +305,13 @@ class ApiClient {
   }
 
   async deleteProduct(id: number): Promise<void> {
-    await fetch(`${API_BASE}/api/products/${id}`, { method: "DELETE" });
+    await this.fetchWithAuth(`${API_BASE}/api/products/${id}`, {
+      method: "DELETE",
+    });
   }
 
   async importProducts(products: Omit<Product, "id">[]): Promise<Product[]> {
-    const res = await fetch(`${API_BASE}/api/products`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ products }),
@@ -162,7 +321,7 @@ class ApiClient {
   }
 
   async getLeads(): Promise<Lead[]> {
-    const res = await fetch(`${API_BASE}/api/leads`);
+    const res = await this.fetchWithAuth(`${API_BASE}/api/leads`);
     const data = await res.json();
     return data.leads;
   }
@@ -170,7 +329,7 @@ class ApiClient {
   async importLeads(
     companies: string[],
   ): Promise<{ leads_created: number; lead_ids: number[]; status: string }> {
-    const res = await fetch(`${API_BASE}/api/leads/import`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/leads/import`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companies }),
@@ -179,16 +338,18 @@ class ApiClient {
   }
 
   async getLead(id: number): Promise<Lead> {
-    const res = await fetch(`${API_BASE}/api/leads/${id}`);
+    const res = await this.fetchWithAuth(`${API_BASE}/api/leads/${id}`);
     return res.json();
   }
 
   async triggerEnrichment(leadId: number): Promise<void> {
-    await fetch(`${API_BASE}/api/leads/${leadId}/enrich`, { method: "POST" });
+    await this.fetchWithAuth(`${API_BASE}/api/leads/${leadId}/enrich`, {
+      method: "POST",
+    });
   }
 
   async generateMatches(): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/matches/generate`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/matches/generate`, {
       method: "POST",
     });
     if (!res.ok) throw new Error("Failed to generate matches");
@@ -204,25 +365,27 @@ class ApiClient {
     if (productId) params.append("product_id", productId.toString());
     if (params.toString()) url += `?${params.toString()}`;
 
-    const res = await fetch(url);
+    const res = await this.fetchWithAuth(url);
     const data = await res.json();
     return data.matches;
   }
 
   async generatePitchDeck(leadId: number, productId: number): Promise<void> {
-    await fetch(
+    await this.fetchWithAuth(
       `${API_BASE}/api/leads/${leadId}/pitch-deck?product_id=${productId}`,
       { method: "POST" },
     );
   }
 
   async getPitchDeck(leadId: number): Promise<string> {
-    const res = await fetch(`${API_BASE}/api/leads/${leadId}/pitch-deck`);
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/leads/${leadId}/pitch-deck`,
+    );
     return res.text();
   }
 
   async downloadPitchDeck(leadId: number): Promise<Blob> {
-    const res = await fetch(
+    const res = await this.fetchWithAuth(
       `${API_BASE}/api/leads/${leadId}/pitch-deck/download`,
     );
     return res.blob();
@@ -232,7 +395,7 @@ class ApiClient {
     leadId: number,
     productId: number,
   ): Promise<{ subject: string; body: string }> {
-    const res = await fetch(
+    const res = await this.fetchWithAuth(
       `${API_BASE}/api/leads/${leadId}/email?product_id=${productId}`,
       { method: "POST" },
     );
@@ -240,11 +403,13 @@ class ApiClient {
   }
 
   async generateVoice(leadId: number): Promise<void> {
-    await fetch(`${API_BASE}/api/leads/${leadId}/voice`, { method: "POST" });
+    await this.fetchWithAuth(`${API_BASE}/api/leads/${leadId}/voice`, {
+      method: "POST",
+    });
   }
 
   async getAnalytics(): Promise<unknown> {
-    const res = await fetch(`${API_BASE}/api/analytics`);
+    const res = await this.fetchWithAuth(`${API_BASE}/api/analytics`);
     return res.json();
   }
 
@@ -255,7 +420,7 @@ class ApiClient {
     geography?: string;
     value_proposition?: string;
   }> {
-    const res = await fetch(`${API_BASE}/api/company-profile`);
+    const res = await this.fetchWithAuth(`${API_BASE}/api/company-profile`);
     return res.json();
   }
 
@@ -266,11 +431,27 @@ class ApiClient {
     geography?: string;
     value_proposition?: string;
   }): Promise<unknown> {
-    const res = await fetch(`${API_BASE}/api/company-profile`, {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/company-profile`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(profile),
     });
+    return res.json();
+  }
+
+  async runDiscovery(
+    productIds?: number[],
+    maxCompanies: number = 20,
+  ): Promise<{ status: string; max_companies: number }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/discovery/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_ids: productIds,
+        max_companies: maxCompanies,
+      }),
+    });
+    if (!res.ok) throw new Error("Failed to start discovery");
     return res.json();
   }
 }

@@ -29,9 +29,20 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
     const next = [...features];
     next[idx] = val;
     setFeatures(next);
+    // Auto-add a new empty slot if the last feature is filled and it's the last one
+    if (idx === features.length - 1 && val.trim() !== "" && features.length < 10) { // Limit to prevent too many
+      setFeatures([...next, ""]);
+    }
   };
 
   const addFeatureSlot = () => setFeatures([...features, ""]);
+
+  const removeFeature = (idx: number) => {
+    if (features.length > 1) {
+      const next = features.filter((_, i) => i !== idx);
+      setFeatures(next);
+    }
+  };
 
   const [saving, setSaving] = useState(false);
 
@@ -110,7 +121,7 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
       {/* Form */}
       <div className="clay-card rounded-2xl overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-          <div className="size-6 rounded bg-purple-100 text-purple-600 flex items-center justify-center">
+          <div className="size-6 rounded bg-grey-100 text-grey-600 flex items-center justify-center">
             <span className="material-symbols-outlined text-[16px]">
               inventory_2
             </span>
@@ -158,44 +169,41 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
                 Key Features
               </label>
               <div className="space-y-2">
-                {features.map((f, i) => (
-                  <div key={i} className="flex gap-2">
-                    <span
-                      className={`material-symbols-outlined mt-2 text-[18px] ${f ? "text-slate-400" : "text-slate-300"}`}
-                    >
-                      {f ? "check_circle" : "add_circle"}
-                    </span>
+                {features.map((feature, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
                     <input
-                      value={f}
-                      onChange={(e) => updateFeature(i, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && i === features.length - 1 && f)
-                          addFeatureSlot();
-                      }}
-                      className={`w-full rounded-lg border border-slate-200 text-slate-900 px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all ${
-                        f
-                          ? "bg-white"
-                          : "bg-slate-50 placeholder:text-slate-400"
-                      }`}
-                      placeholder="Add another feature"
+                      type="text"
+                      value={feature}
+                      onChange={(e) => updateFeature(idx, e.target.value)}
+                      placeholder={`Key Feature ${idx + 1}`}
+                      className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                     />
+                    {features.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeFeature(idx)}
+                        className="px-2 py-1 text-red-600 hover:text-red-800"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
-            <div>
+            <div className="mb-8">  {/* Added margin-bottom for spacing below the grey box */}
               <label className="block text-sm font-semibold text-slate-700 mb-3">
                 Main Differentiator
               </label>
-              <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 h-full flex flex-col">
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 h-full flex flex-col pb-4">
                 <textarea
                   value={differentiator}
                   onChange={(e) => setDifferentiator(e.target.value)}
-                  className="w-full bg-transparent border-none p-0 text-sm text-slate-800 placeholder:text-slate-400 focus:ring-0 resize-none leading-relaxed flex-grow"
+                  className="w-full bg-transparent border-none p-0 text-sm text-gray-700 placeholder:text-gray-400 focus:ring-0 resize-none leading-relaxed flex-grow"
                   placeholder="Why do customers choose this over competitors?"
                   rows={4}
                 />
-                <div className="mt-2 flex items-center gap-1.5 text-xs text-blue-600">
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-gray-600">
                   <span className="material-symbols-outlined text-[14px]">
                     auto_awesome
                   </span>

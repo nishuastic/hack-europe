@@ -150,18 +150,21 @@ async def match_lead_to_products(lead: Lead, products: list[Product]) -> list[di
     return parsed.get("matches", [])  # type: ignore[no-any-return]
 
 
-async def generate_all_matches(ws_manager) -> None:
+async def generate_all_matches(ws_manager, user_id: int) -> None:
     """Generate matches for all enriched leads against all products."""
     from sqlmodel import select
 
     async with async_session() as session:
         # Load all enriched leads and all products
         leads_result = await session.execute(
-            select(Lead).where(Lead.enrichment_status == EnrichmentStatus.COMPLETE)
+            select(Lead).where(
+                Lead.enrichment_status == EnrichmentStatus.COMPLETE,
+                Lead.user_id == user_id,
+            )
         )
         leads = list(leads_result.scalars().all())
 
-        products_result = await session.execute(select(Product))
+        products_result = await session.execute(select(Product).where(Product.user_id == user_id))
         products = list(products_result.scalars().all())
 
         if not leads or not products:
@@ -196,7 +199,7 @@ async def generate_all_matches(ws_manager) -> None:
                             ProductMatch.lead_id == lead.id,
                             ProductMatch.product_id == product_id,
                         )
-                    )).scalar_one_or_none()
+                    ).scalar_one_or_none()
                     if existing:
                         await session.delete(existing)
                         await session.flush()

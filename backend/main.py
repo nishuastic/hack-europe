@@ -1,19 +1,23 @@
-"""SalesForge API — FastAPI application with WebSocket streaming."""
+"""Stick API — FastAPI application with WebSocket streaming."""
 
 import asyncio
 import json
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from backend.auth import create_access_token, get_current_user, hash_password, verify_password
+from backend.auth import (
+    create_access_token,
+    create_refresh_token,
+    get_current_user,
+    hash_password,
+    verify_password,
+)
 from backend.db import get_session, init_db
 from backend.discovery.discovery_pipeline import run_discovery
 from backend.enrichment.pipeline import enrich_lead, enrich_leads
@@ -33,7 +37,6 @@ logger = logging.getLogger(__name__)
 
 
 # ─── WebSocket Manager ───────────────────────────────────────────────
-
 
 class ConnectionManager:
     def __init__(self):
@@ -60,7 +63,6 @@ manager = ConnectionManager()
 
 # ─── App Lifespan ─────────────────────────────────────────────────────
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -68,7 +70,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SalesForge", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Stick API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -80,7 +82,6 @@ app.add_middleware(
 
 
 # ─── WebSocket Endpoint ──────────────────────────────────────────────
-
 
 @app.websocket("/ws/updates")
 async def websocket_endpoint(ws: WebSocket):
@@ -94,6 +95,7 @@ async def websocket_endpoint(ws: WebSocket):
 
 # ─── Auth Schemas & Routes ────────────────────────────────────────────
 
+
 class RegisterRequest(BaseModel):
     email: str
     password: str
@@ -103,6 +105,10 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
 
 
 @app.post("/api/auth/register")
@@ -115,8 +121,14 @@ async def register(body: RegisterRequest, session: AsyncSession = Depends(get_se
     await session.commit()
     await session.refresh(user)
     assert user.id is not None
-    token = create_access_token(user.id, user.email)
-    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name}}
+    access = create_access_token(user.id, user.email)
+    refresh = create_refresh_token(user.id)
+    return {
+        "access_token": access,
+        "refresh_token": refresh,
+        "token_type": "bearer",
+        "user": {"id": user.id, "email": user.email, "name": user.name},
+    }
 
 
 @app.post("/api/auth/login")
@@ -125,8 +137,34 @@ async def login(body: LoginRequest, session: AsyncSession = Depends(get_session)
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     assert user.id is not None
-    token = create_access_token(user.id, user.email)
-    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name}}
+    access = create_access_token(user.id, user.email)
+    refresh = create_refresh_token(user.id)
+    return {
+        "access_token": access,
+        "refresh_token": refresh,
+        "token_type": "bearer",
+        "user": {"id": user.id, "email": user.email, "name": user.name},
+    }
+
+
+@app.post("/api/auth/refresh")
+async def refresh_token(body: RefreshTokenRequest, session: AsyncSession = Depends(get_session)):
+    from jose import jwt
+
+    try:
+        payload = jwt.decode(body.refresh_token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+        user_id = int(payload["sub"])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user = (await session.execute(select(User).where(User.id == user_id))).scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    access = create_access_token(user.id, user.email)
+    return {"access_token": access, "token_type": "bearer"}
 
 
 @app.get("/api/auth/me")
@@ -135,7 +173,6 @@ async def get_me(user: User = Depends(get_current_user)):
 
 
 # ─── Request/Response Schemas ─────────────────────────────────────────
-
 
 class ProductCreate(BaseModel):
     name: str
@@ -171,31 +208,32 @@ class BulkProductImport(BaseModel):
     products: list[ProductCreate]
 
 
-class DiscoveryRequest(BaseModel):
-    product_ids: list[int] | None = None
-    max_companies: int = 20
+class LeadImport(BaseModel):
+    companies: list[str]
 
 
-class CompanyProfileUpsert(BaseModel):
-    company_name: str
+class CompanyProfileUpdate(BaseModel):
+    company_name: str | None = None
     website: str | None = None
     growth_stage: str | None = None
     geography: str | None = None
     value_proposition: str | None = None
 
 
-class LeadImport(BaseModel):
-    companies: list[str]
+class DiscoveryRequest(BaseModel):
+    product_ids: list[int] | None = None
+    max_companies: int = 20
 
 
 # ─── Product CRUD ─────────────────────────────────────────────────────
 
-
 @app.post("/api/products")
-async def import_products(body: BulkProductImport, session: AsyncSession = Depends(get_session)):
+async def import_products(
+    body: BulkProductImport, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+):
     created = []
     for p in body.products:
-        product = Product(**p.model_dump())
+        product = Product(**p.model_dump(), user_id=user.id)
         session.add(product)
         await session.commit()
         await session.refresh(product)
@@ -204,22 +242,33 @@ async def import_products(body: BulkProductImport, session: AsyncSession = Depen
 
 
 @app.get("/api/products")
-async def list_products(session: AsyncSession = Depends(get_session)):
-    result = await session.execute(select(Product))
+async def list_products(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
+    result = await session.execute(select(Product).where(Product.user_id == user.id))
     return {"products": result.scalars().all()}
 
 
 @app.get("/api/products/{product_id}")
-async def get_product(product_id: int, session: AsyncSession = Depends(get_session)):
-    product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+async def get_product(
+    product_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+):
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
 
 
 @app.put("/api/products/{product_id}")
-async def update_product(product_id: int, body: ProductUpdate, session: AsyncSession = Depends(get_session)):
-    product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+async def update_product(
+    product_id: int,
+    body: ProductUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     for field, value in body.model_dump(exclude_unset=True).items():
@@ -231,8 +280,12 @@ async def update_product(product_id: int, body: ProductUpdate, session: AsyncSes
 
 
 @app.delete("/api/products/{product_id}")
-async def delete_product(product_id: int, session: AsyncSession = Depends(get_session)):
-    product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+async def delete_product(
+    product_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+):
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     await session.delete(product)
@@ -244,21 +297,23 @@ async def delete_product(product_id: int, session: AsyncSession = Depends(get_se
 
 
 @app.get("/api/company-profile")
-async def get_company_profile(session: AsyncSession = Depends(get_session)):
-    result = await session.execute(select(CompanyProfile))
+async def get_company_profile(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
+    result = await session.execute(select(CompanyProfile).where(CompanyProfile.user_id == user.id))
     profile = result.scalar_one_or_none()
     return profile or {}
 
 
 @app.put("/api/company-profile")
-async def upsert_company_profile(body: CompanyProfileUpsert, session: AsyncSession = Depends(get_session)):
-    result = await session.execute(select(CompanyProfile))
+async def upsert_company_profile(
+    body: CompanyProfileUpdate, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+):
+    result = await session.execute(select(CompanyProfile).where(CompanyProfile.user_id == user.id))
     profile = result.scalar_one_or_none()
     if profile:
-        for field, value in body.model_dump().items():
+        for field, value in body.model_dump(exclude_unset=True).items():
             setattr(profile, field, value)
     else:
-        profile = CompanyProfile(**body.model_dump())
+        profile = CompanyProfile(**body.model_dump(), user_id=user.id)
     session.add(profile)
     await session.commit()
     await session.refresh(profile)
@@ -269,9 +324,9 @@ async def upsert_company_profile(body: CompanyProfileUpsert, session: AsyncSessi
 
 
 @app.post("/api/discovery/run")
-async def run_discovery_endpoint(body: DiscoveryRequest):
+async def run_discovery_endpoint(body: DiscoveryRequest, user: User = Depends(get_current_user)):
     """Kick off ICP-based company discovery. Fire-and-forget async pipeline."""
-    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager))
+    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager, user.id))
     return {
         "status": "discovery_started",
         "max_companies": body.max_companies,
@@ -280,12 +335,13 @@ async def run_discovery_endpoint(body: DiscoveryRequest):
 
 # ─── Lead Import + List ───────────────────────────────────────────────
 
-
 @app.post("/api/leads/import")
-async def import_leads(body: LeadImport, session: AsyncSession = Depends(get_session)):
+async def import_leads(
+    body: LeadImport, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+):
     lead_ids: list[int] = []
     for company in body.companies:
-        lead = Lead(company_name=company, enrichment_status=EnrichmentStatus.PENDING)
+        lead = Lead(company_name=company, enrichment_status=EnrichmentStatus.PENDING, user_id=user.id)
         session.add(lead)
         await session.commit()
         await session.refresh(lead)
@@ -299,23 +355,25 @@ async def import_leads(body: LeadImport, session: AsyncSession = Depends(get_ses
 
 
 @app.get("/api/leads")
-async def list_leads(session: AsyncSession = Depends(get_session)):
-    result = await session.execute(select(Lead))
+async def list_leads(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
+    result = await session.execute(select(Lead).where(Lead.user_id == user.id))
     return {"leads": result.scalars().all()}
 
 
 @app.get("/api/leads/{lead_id}")
-async def get_lead(lead_id: int, session: AsyncSession = Depends(get_session)):
-    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+async def get_lead(lead_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     return lead
 
 
 @app.post("/api/leads/{lead_id}/enrich")
-async def trigger_enrich(lead_id: int, session: AsyncSession = Depends(get_session)):
+async def trigger_enrich(
+    lead_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+):
     """Re-trigger enrichment for a single lead."""
-    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     if lead.enrichment_status == EnrichmentStatus.IN_PROGRESS:
@@ -333,12 +391,13 @@ async def trigger_enrich(lead_id: int, session: AsyncSession = Depends(get_sessi
 
 # ─── Product Matching ─────────────────────────────────────────────────
 
+
 @app.post("/api/matches/generate")
-async def trigger_matching():
+async def trigger_matching(user: User = Depends(get_current_user)):
     """Generate matches for all enriched leads against all products. Fire-and-forget."""
     from backend.matching.pipeline import generate_all_matches
 
-    asyncio.create_task(generate_all_matches(manager))
+    asyncio.create_task(generate_all_matches(manager, user.id))
     return {"status": "matching_started"}
 
 
@@ -347,9 +406,10 @@ async def list_matches(
     lead_id: int | None = Query(default=None),
     product_id: int | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """List matches with optional lead_id and product_id filters."""
-    query = select(ProductMatch)
+    query = select(ProductMatch).join(Lead).where(Lead.user_id == user.id)
     if lead_id is not None:
         query = query.where(ProductMatch.lead_id == lead_id)
     if product_id is not None:
@@ -361,30 +421,39 @@ async def list_matches(
 
 # ─── Pitch Deck ───────────────────────────────────────────────────────
 
+
 @app.post("/api/leads/{lead_id}/pitch-deck")
 async def create_pitch_deck(
     lead_id: int,
     product_id: int = Query(...),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """Generate a pitch deck for a lead-product pair. Awaited (not fire-and-forget)."""
     from backend.actions.pitch_deck import generate_pitch_deck
 
-    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
-    product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Get match reasoning if available
-    match_obj = (await session.execute(
-        select(ProductMatch).where(
-            ProductMatch.lead_id == lead_id,
-            ProductMatch.product_id == product_id,
+    match_obj = (
+        await session.execute(
+            select(ProductMatch)
+            .join(Lead)
+            .where(
+                ProductMatch.lead_id == lead_id,
+                ProductMatch.product_id == product_id,
+                Lead.user_id == user.id,
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
     reasoning = match_obj.match_reasoning if match_obj else "No prior match — generate general pitch."
 
     result = await generate_pitch_deck(lead, product, reasoning)
@@ -410,9 +479,10 @@ async def get_pitch_deck(
     lead_id: int,
     product_id: int | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """Get existing pitch deck for a lead (optionally filtered by product)."""
-    query = select(PitchDeck).where(PitchDeck.lead_id == lead_id)
+    query = select(PitchDeck).join(Lead).where(PitchDeck.lead_id == lead_id, Lead.user_id == user.id)
     if product_id is not None:
         query = query.where(PitchDeck.product_id == product_id)
     query = query.order_by(PitchDeck.created_at.desc())  # type: ignore[attr-defined]
@@ -427,9 +497,10 @@ async def download_pitch_deck(
     lead_id: int,
     product_id: int | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """Download the PPTX file for a pitch deck."""
-    query = select(PitchDeck).where(PitchDeck.lead_id == lead_id)
+    query = select(PitchDeck).join(Lead).where(PitchDeck.lead_id == lead_id, Lead.user_id == user.id)
     if product_id is not None:
         query = query.where(PitchDeck.product_id == product_id)
     query = query.order_by(PitchDeck.created_at.desc())  # type: ignore[attr-defined]
@@ -447,30 +518,39 @@ async def download_pitch_deck(
 
 # ─── Email Generator ─────────────────────────────────────────────────
 
+
 @app.post("/api/leads/{lead_id}/email")
 async def create_email(
     lead_id: int,
     product_id: int = Query(...),
     session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
 ):
     """Generate an outreach email for a lead-product pair."""
     from backend.actions.email_generator import generate_email
 
-    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
 
-    product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
     # Get match reasoning
-    match_obj = (await session.execute(
-        select(ProductMatch).where(
-            ProductMatch.lead_id == lead_id,
-            ProductMatch.product_id == product_id,
+    match_obj = (
+        await session.execute(
+            select(ProductMatch)
+            .join(Lead)
+            .where(
+                ProductMatch.lead_id == lead_id,
+                ProductMatch.product_id == product_id,
+                Lead.user_id == user.id,
+            )
         )
-    )).scalar_one_or_none()
+    ).scalar_one_or_none()
     reasoning = match_obj.match_reasoning if match_obj else ""
 
     result = await generate_email(lead, product, reasoning)
@@ -495,18 +575,19 @@ async def create_email(
 
 # ─── Analytics ────────────────────────────────────────────────────────
 
+
 @app.get("/api/analytics")
-async def get_analytics_endpoint(session: AsyncSession = Depends(get_session)):
+async def get_analytics_endpoint(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
     """Get analytics dashboard data."""
     from backend.analytics import get_analytics
 
-    return await get_analytics(session)
+    return await get_analytics(session, user.id)
 
 
 @app.post("/api/analytics/predict")
-async def trigger_predictions(session: AsyncSession = Depends(get_session)):
+async def trigger_predictions(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
     """Predict conversion likelihood for matches missing predictions."""
     from backend.analytics import predict_conversions
 
-    asyncio.create_task(predict_conversions(manager, session))
+    asyncio.create_task(predict_conversions(manager, session, user.id))
     return {"status": "prediction_started"}

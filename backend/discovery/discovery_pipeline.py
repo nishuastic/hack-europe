@@ -18,6 +18,7 @@ async def run_discovery(
     product_ids: list[int] | None,
     max_companies: int,
     ws_manager: Any,
+    user_id: int,
 ) -> None:
     """Full discovery pipeline: load products -> run agent -> create leads -> enrich.
 
@@ -27,10 +28,10 @@ async def run_discovery(
         # Load products
         if product_ids:
             result = await session.execute(
-                select(Product).where(Product.id.in_(product_ids))  # type: ignore[union-attr]
+                select(Product).where(Product.id.in_(product_ids), Product.user_id == user_id)  # type: ignore[union-attr]
             )
         else:
-            result = await session.execute(select(Product))
+            result = await session.execute(select(Product).where(Product.user_id == user_id))
         products = list(result.scalars().all())
 
         if not products:
@@ -80,6 +81,7 @@ async def run_discovery(
                     continue
 
                 lead = Lead(
+                    user_id=user_id,
                     company_name=company_name,
                     company_url=company.get("company_url"),
                     description=company.get("description"),

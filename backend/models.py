@@ -1,4 +1,4 @@
-"""SalesForge data models — SQLModel schemas for leads, enrichments, product matching, and pitch decks."""
+"""Stick data models — SQLModel schemas for leads, enrichments, product matching, and pitch decks."""
 
 from datetime import datetime
 from enum import Enum
@@ -9,11 +9,18 @@ from sqlmodel import JSON, Column, Field, SQLModel
 
 class User(SQLModel, table=True):
     """A registered user."""
+
     id: int | None = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     hashed_password: str
     name: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserLinkedMixin(SQLModel):
+    """Mixin for models that should be linked to a user."""
+
+    user_id: int = Field(foreign_key="user.id", index=True)
 
 
 class EnrichmentStatus(str, Enum):
@@ -55,6 +62,7 @@ class CompanyProfile(SQLModel, table=True):
     """The user's own company profile — used by AI for context when generating pitches."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
     company_name: str
     website: Optional[str] = None
     growth_stage: Optional[str] = None  # Pre-Seed, Seed, Series A, Series B+, Public
@@ -67,6 +75,7 @@ class Lead(SQLModel, table=True):
     """A target company to enrich and pitch."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Input fields
@@ -96,6 +105,7 @@ class Product(SQLModel, table=True):
     """A product in the user's catalog — matched against leads by AI."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
     name: str
     description: str  # What you sell, clear simple description
     features: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))  # Main product/service features

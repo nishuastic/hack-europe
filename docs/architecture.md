@@ -179,10 +179,19 @@ GET    /api/billing/credits          # Remaining credits (Phase 3)
 {"type": "enrichment_complete", "lead_id": 1, "company_name": "Stripe", "rounds": 2}
 {"type": "enrichment_error", "lead_id": 1, "error": "..."}
 
+<<<<<<< HEAD
+Match update:
+```json
+{"type": "match_update", "lead_id": 1, "product_id": 2,
+ "match_score": 8.5, "match_reasoning": "Strong alignment because...",
+ "product_name": "Stick Pro"}
+```
+=======
 // Matching
 {"type": "matching_start", "total_leads": 5, "total_products": 3}
 {"type": "match_update", "lead_id": 1, "product_id": 2, "match_score": 8.5, "match_reasoning": "..."}
 {"type": "matching_complete"}
+>>>>>>> 8d9f7ae204225a5c5fe19a72a608e654cc029ff5
 
 // Predictions
 {"type": "prediction_update", "lead_id": 1, "product_id": 2, "conversion_likelihood": "high"}

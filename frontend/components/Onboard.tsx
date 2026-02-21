@@ -83,12 +83,12 @@ export default function Onboard() {
       {/* Company Profile */}
       <section className="flex flex-col gap-4">
         <div className="flex items-center gap-2 mb-1">
-          <div className="size-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center">
+          <div className="size-6 rounded bg-grey-100 text-grey-600 flex items-center justify-center">
             <span className="material-symbols-outlined text-[16px]">
               business
             </span>
           </div>
-          <h2 className="text-lg font-bold text-slate-800">Company Profile</h2>
+          <h2 className="text-lg font-bold text-slate-800">My Company Profile</h2>
         </div>
         <div className="clay-card rounded-2xl p-6 md:p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
@@ -100,7 +100,7 @@ export default function Onboard() {
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400"
-                placeholder="e.g. SalesForge"
+                placeholder="e.g. Stick"
               />
             </div>
             <div>
