@@ -30,7 +30,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-[#f8f9fa] font-display text-slate-900 min-h-screen overflow-hidden antialiased">
+      <body className="bg-[#f8f9fa] font-display text-slate-900 min-h-screen flex antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
