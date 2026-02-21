@@ -43,14 +43,37 @@ would be ideal customers for the products below.
 
 ## Your Task
 
-1. **Derive Ideal Customer Profiles (ICPs):** Analyze the products above and determine \
-what types of companies would benefit most from each product. Consider industry, company \
-size, stage, geography, pain points, and technology usage.
+1. **Derive Ideal Customer Profiles (ICPs):** Analyze the vendor/product profile(s) above (provided in JSON) describing what they sell, who they sell to, what problems they solve, and what makes them different.
 
-2. **Search for matching companies:** Use the `search_companies` tool to find real \
-companies matching each ICP. Generate specific, targeted search queries — e.g. \
-"Series B fintech startups in Europe", "mid-market SaaS companies hiring for data engineering", \
-"healthcare companies using legacy ERP systems".
+   Rules:
+   - Use the vendor JSON as the ONLY source of truth. Do not assume or invent any constraints.
+   - If a detail is not present in the JSON, do not include it.
+
+   Output format (IMPORTANT):
+   - Return exactly TWO paragraphs of plain text.
+   - Paragraph 1: 1–2 sentence summary of the vendor and its offering.
+   - Paragraph 2: The Ideal Customer Profile (ICP) in 3–6 sentences, explicitly covering:
+     - Target industries (if specified)
+     - Geography served (if specified)
+     - Company size/stage (if specified)
+     - Primary buyer roles/titles (if specified)
+     - The problems/pains they likely have (based only on the offering description)
+     - Key success outcome they want (based only on the offering description)
+
+2. **Search for matching companies:** Use the `search_companies(query, depth)` tool to find REAL companies matching the ICP derived in step 1.
+
+   Query rules:
+   - Use ONLY the information contained in the two ICP paragraphs (vendor summary + ICP). Do NOT invent new industries, geographies, size, or stage constraints.
+   - Queries must be short, search-engine style strings (keywords/phrases), not instructions or multi-step prompts.
+   - Do NOT include specific company names in the query (you are trying to discover companies, not look up one company).
+
+   Query guidelines:
+   - Generate 3–5 targeted queries per ICP angle.
+   - Use "standard" depth for broad discovery and simple lists.
+   - Use "deep" depth for harder-to-find intent signals (hiring, tooling/vendor usage, funding, expansion, partnerships).
+   - Each query should target a distinct angle and be meaningfully different (industry list, geography + size, hiring signal, tooling signal, funding/stage signal).
+   - If the ICP mentions tools/integrations or strong problem keywords, include them as intent signals.
+   - Prefer queries that tend to return company lists (e.g., include terms like: companies, startups, scale-ups, mid-market, “top”, “best” when helpful).
 
 3. **Validate promising companies:** For companies that look like good fits, use \
 `fetch_company_website` to read their website and `get_company_details` to extract \

@@ -137,6 +137,10 @@ _COMPANY_SEARCH_SCHEMA = json.dumps({
                     "url": {"type": "string"},
                     "description": {"type": "string"},
                     "industry": {"type": "string"},
+                    "reason" : {
+                        "type" : "string",
+                        "description" : "Why this company matches criteria"
+                    }
                 },
                 "required": ["name"],
             },
