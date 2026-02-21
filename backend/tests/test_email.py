@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 
 
-async def test_create_email_lead_not_found(client: AsyncClient):
+async def test_create_email_lead_not_found(authed_client: AsyncClient):
     """Test POST /api/leads/{id}/email returns 404 for missing lead."""
-    resp = await client.post("/api/leads/999/email", params={"product_id": 1})
+    resp = await authed_client.post("/api/leads/999/email", params={"product_id": 1})
     assert resp.status_code == 404
 
 

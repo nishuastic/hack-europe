@@ -3,10 +3,12 @@
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -18,6 +20,18 @@ from backend.auth import (
     hash_password,
     verify_password,
 )
+from backend.billing import (
+    CREDIT_COSTS,
+    PAYG_PACKS,
+    TIER_PLANS,
+    check_credits,
+    create_payg_checkout,
+    create_tier_checkout,
+    deduct_credits,
+    ensure_customer,
+    handle_stripe_webhook,
+)
+from backend.config import settings  # noqa: F401 — used in refresh endpoint
 from backend.db import get_session, init_db
 from backend.discovery.discovery_pipeline import run_discovery
 from backend.enrichment.pipeline import enrich_lead, enrich_leads
@@ -29,7 +43,10 @@ from backend.models import (
     PitchDeck,
     Product,
     ProductMatch,
+    UsageEvent,
+    UsageEventType,
     User,
+    UserCredits,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -121,6 +138,10 @@ async def register(body: RegisterRequest, session: AsyncSession = Depends(get_se
     await session.commit()
     await session.refresh(user)
     assert user.id is not None
+    # Initialize free credits
+    user_credits = UserCredits(user_id=user.id, credits_remaining=100)
+    session.add(user_credits)
+    await session.commit()
     access = create_access_token(user.id, user.email)
     refresh = create_refresh_token(user.id)
     return {
@@ -373,11 +394,17 @@ async def trigger_enrich(
     lead_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
 ):
     """Re-trigger enrichment for a single lead."""
+    assert user.id is not None
+    if not await check_credits(user.id, UsageEventType.ENRICHMENT, session):
+        raise HTTPException(status_code=402, detail="Insufficient credits for enrichment")
+
     lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     if lead.enrichment_status == EnrichmentStatus.IN_PROGRESS:
         raise HTTPException(status_code=409, detail="Enrichment already in progress")
+
+    await deduct_credits(user.id, UsageEventType.ENRICHMENT, session, {"lead_id": lead_id})
 
     # Reset status
     lead.enrichment_status = EnrichmentStatus.PENDING
@@ -393,8 +420,17 @@ async def trigger_enrich(
 
 
 @app.post("/api/matches/generate")
-async def trigger_matching(user: User = Depends(get_current_user)):
+async def trigger_matching(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
     """Generate matches for all enriched leads against all products. Fire-and-forget."""
+    assert user.id is not None
+    if not await check_credits(user.id, UsageEventType.MATCHING, session):
+        raise HTTPException(status_code=402, detail="Insufficient credits for matching")
+
+    await deduct_credits(user.id, UsageEventType.MATCHING, session)
+
     from backend.matching.pipeline import generate_all_matches
 
     asyncio.create_task(generate_all_matches(manager, user.id))
@@ -430,6 +466,10 @@ async def create_pitch_deck(
     user: User = Depends(get_current_user),
 ):
     """Generate a pitch deck for a lead-product pair. Awaited (not fire-and-forget)."""
+    assert user.id is not None
+    if not await check_credits(user.id, UsageEventType.PITCH_DECK, session):
+        raise HTTPException(status_code=402, detail="Insufficient credits for pitch deck generation")
+
     from backend.actions.pitch_deck import generate_pitch_deck
 
     lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
@@ -457,6 +497,7 @@ async def create_pitch_deck(
     reasoning = match_obj.match_reasoning if match_obj else "No prior match — generate general pitch."
 
     result = await generate_pitch_deck(lead, product, reasoning)
+    await deduct_credits(user.id, UsageEventType.PITCH_DECK, session, {"lead_id": lead_id, "product_id": product_id})
 
     # Save to DB
     deck = PitchDeck(
@@ -527,6 +568,10 @@ async def create_email(
     user: User = Depends(get_current_user),
 ):
     """Generate an outreach email for a lead-product pair."""
+    assert user.id is not None
+    if not await check_credits(user.id, UsageEventType.EMAIL, session):
+        raise HTTPException(status_code=402, detail="Insufficient credits for email generation")
+
     from backend.actions.email_generator import generate_email
 
     lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
@@ -554,6 +599,7 @@ async def create_email(
     reasoning = match_obj.match_reasoning if match_obj else ""
 
     result = await generate_email(lead, product, reasoning)
+    await deduct_credits(user.id, UsageEventType.EMAIL, session, {"lead_id": lead_id, "product_id": product_id})
 
     # Save to DB
     email_record = GeneratedEmail(
@@ -591,3 +637,92 @@ async def trigger_predictions(session: AsyncSession = Depends(get_session), user
 
     asyncio.create_task(predict_conversions(manager, session, user.id))
     return {"status": "prediction_started"}
+
+
+# ─── Billing ─────────────────────────────────────────────────────────
+
+
+class TierCheckoutRequest(BaseModel):
+    tier: str  # "starter", "growth", "scale"
+
+
+class PaygCheckoutRequest(BaseModel):
+    pack: str  # "100", "500", "2000", "5000"
+
+
+@app.get("/api/billing/credits")
+async def get_credits(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Get current user's credit balance + available plans and packs."""
+    assert user.id is not None
+    credits = await ensure_customer(user.id, user.email, session)
+    return {
+        "currency": "stick_credits",
+        "credits_remaining": credits.credits_remaining,
+        "costs": {k.value: v for k, v in CREDIT_COSTS.items()},
+        "tiers": TIER_PLANS,
+        "payg_packs": PAYG_PACKS,
+    }
+
+
+@app.post("/api/billing/subscribe")
+async def subscribe_tier(
+    body: TierCheckoutRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Create a Stripe Checkout session for a monthly tier subscription."""
+    assert user.id is not None
+    await ensure_customer(user.id, user.email, session)
+    url = await create_tier_checkout(user.id, body.tier, session)
+    return {"checkout_url": url}
+
+
+@app.post("/api/billing/buy-credits")
+async def buy_credits(
+    body: PaygCheckoutRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Create a Stripe Checkout session for a one-time credit pack purchase."""
+    assert user.id is not None
+    await ensure_customer(user.id, user.email, session)
+    url = await create_payg_checkout(user.id, body.pack, session)
+    return {"checkout_url": url}
+
+
+@app.post("/api/billing/webhook")
+async def stripe_webhook(request: Request, session: AsyncSession = Depends(get_session)):
+    """Handle Stripe webhook events (adds credits on successful payment)."""
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        result = await handle_stripe_webhook(payload, sig, session)
+        return result
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+
+@app.get("/api/billing/usage")
+async def get_usage(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Get usage history for current user."""
+    assert user.id is not None
+    result = await session.execute(
+        select(UsageEvent)
+        .where(UsageEvent.user_id == user.id)
+        .order_by(UsageEvent.created_at.desc())  # type: ignore[attr-defined]
+    )
+    events = result.scalars().all()
+    return {
+        "usage": [
+            {"event_type": e.event_type, "credits_used": e.credits_used, "created_at": str(e.created_at)}
+            for e in events
+        ]
+    }
