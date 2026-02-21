@@ -37,13 +37,20 @@ hack-europe/
 │   │   └── stripe_billing.py        # Stripe Checkout + metered usage
 │   └── agent/
 │       └── orchestrator.py          # Claude tool-use agentic loop
+│   ├── discovery/
+│   │   ├── __init__.py
+│   │   ├── prompts.py               # ICP discovery system prompt builder
+│   │   ├── icp_agent.py             # Claude Sonnet tool_use agent (4 tools, iterative search)
+│   │   └── discovery_pipeline.py    # Orchestrator: products → agent → leads → auto-enrich
 ├── prompts/                         # Person B
 │   ├── linkup_queries.py            # Optimized LinkUp query templates
 │   ├── claude_prompts.py            # Claude system prompts for each step
 │   ├── query_planner_prompt.py      # Query planner agent prompt
 │   ├── extraction_prompt.py         # Data extractor agent prompt
+│   ├── discovery_prompt.py          # ICP discovery agent prompt (override)
 │   ├── pitch_deck_prompt.py         # The pitch deck generation prompt
-│   └── test_prompts.py              # Test harness: run N companies, score quality
+│   ├── test_prompts.py              # Test harness: run N companies, score quality
+│   └── test_discovery.py            # Discovery prompt test runner
 ├── frontend/                        # Person C + D
 │   ├── package.json
 │   ├── app/
@@ -307,6 +314,7 @@ GET    /api/products              # List all products
 GET    /api/products/{id}         # Single product detail
 PUT    /api/products/{id}         # Update a product
 DELETE /api/products/{id}         # Remove a product
+POST   /api/discovery/run          # ICP discovery: find leads matching product catalog
 POST   /api/leads/import          # Import CSV of companies
 GET    /api/leads                 # List all leads with enrichment data
 GET    /api/leads/{id}            # Single lead detail
@@ -353,6 +361,15 @@ Cell update:
 ```json
 {"type": "cell_update", "lead_id": 1, "field": "funding",
  "value": "Series B, $45M (2024)"}
+```
+
+Discovery events (ICP pipeline):
+```json
+{"type": "discovery_start", "product_count": 2, "max_companies": 20}
+{"type": "discovery_thinking", "iteration": 1, "detail": "Calling search_companies: ..."}
+{"type": "company_discovered", "lead_id": 5, "company_name": "Acme Corp", "company_url": "https://acme.com", "why_good_fit": "..."}
+{"type": "discovery_complete", "companies_found": 15, "lead_ids": [5, 6, 7, ...]}
+{"type": "discovery_error", "error": "No products found"}
 ```
 
 Enrichment lifecycle:

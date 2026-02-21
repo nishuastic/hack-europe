@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from backend.db import get_session, init_db
+from backend.discovery.discovery_pipeline import run_discovery
 from backend.enrichment.pipeline import enrich_lead, enrich_leads
 from backend.models import EnrichmentStatus, Lead, Product
 
@@ -112,6 +113,11 @@ class BulkProductImport(BaseModel):
     products: list[ProductCreate]
 
 
+class DiscoveryRequest(BaseModel):
+    product_ids: list[int] | None = None
+    max_companies: int = 20
+
+
 class LeadImport(BaseModel):
     companies: list[str]
 
@@ -165,6 +171,18 @@ async def delete_product(product_id: int, session: AsyncSession = Depends(get_se
     await session.delete(product)
     await session.commit()
     return {"deleted": True}
+
+
+# ─── Discovery ───────────────────────────────────────────────────────
+
+@app.post("/api/discovery/run")
+async def run_discovery_endpoint(body: DiscoveryRequest):
+    """Kick off ICP-based company discovery. Fire-and-forget async pipeline."""
+    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager))
+    return {
+        "status": "discovery_started",
+        "max_companies": body.max_companies,
+    }
 
 
 # ─── Lead Import + List ───────────────────────────────────────────────
