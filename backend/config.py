@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str = ""
     paid_api_key: str = ""
     paid_product_external_id: str = "stick_ai_sdr"
-    elevenlabs_api_key: str = ""
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60

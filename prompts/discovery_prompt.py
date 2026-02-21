@@ -10,7 +10,7 @@ optional but recommended for prompt iteration.
 
 The prompt instructs Claude to return a JSON object::
 
-    {"queries": [{"query": "...", "depth": "standard"|"deep", "icp_rationale": "..."}]}
+    {"queries": [{"query": "...", "depth": "standard", "icp_rationale": "..."}]}
 
 Test with::
 

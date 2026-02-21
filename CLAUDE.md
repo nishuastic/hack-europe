@@ -10,7 +10,7 @@ An AI sales agent that takes a product catalog, autonomously discovers target co
 - **Frontend:** Next.js + TypeScript + AG Grid, managed by `bun`
 - **DB:** SQLite via SQLModel
 - **Realtime:** WebSocket (cells update live as enrichment streams in)
-- **AI:** Claude (reasoning/generation), ElevenLabs (voice briefings)
+- **AI:** Claude (reasoning/generation)
 - **Search:** LinkUp SDK
 - **Billing:** Stripe
 
@@ -42,7 +42,6 @@ An AI sales agent that takes a product catalog, autonomously discovers target co
 | Best Use of Claude | $10,000 credits | Core reasoning: query planning, extraction, ICP discovery, matching, deck gen |
 | Best Stripe Integration | €3,000 | Usage-based billing, pay-per-enrichment |
 | Autonomous Consulting Agent | Team lunch | Discovery agent behaves like senior SDR consultant |
-| Best Use of ElevenLabs | AirPods | Voice call-prep briefing per lead |
 
 ## Demo (2 minutes, science-fair format)
 0:00 — "Finding clients costs $50k/year per SDR. Matching the RIGHT product to the RIGHT client? Even harder."
@@ -52,6 +51,5 @@ An AI sales agent that takes a product catalog, autonomously discovers target co
 1:00 — Click top lead → see matched product + score + reasoning
 1:10 — Generate 7-slide pitch deck for that product-company pair
 1:30 — Download PPTX + show drafted email
-1:40 — Play voice briefing
-1:50 — Show Stripe credits
+1:40 — Show Stripe credits
 2:00 — "Stick: your AI sales team. Multiple products, perfect matches, personalized pitches."

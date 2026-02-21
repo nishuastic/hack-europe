@@ -161,7 +161,7 @@ def _build_search_queries_fallback(product: Product) -> list[dict[str, Any]]:
     desc_snippet = (product.description or "")[:80]
     queries.append({
         "query": f"companies that would buy {base} {desc_snippet}",
-        "depth": "deep",
+        "depth": "standard",
         "icp_rationale": "General ICP search",
         "product_id": product_id,
     })
@@ -185,8 +185,8 @@ async def _exec_search_companies(
             """
         )
         response = await client.async_search(
-            query=constrained_query,
-            depth="deep" if depth == "deep" else "standard",
+            query=query,
+            depth="standard",
             output_type="structured",
             structured_output_schema=_COMPANY_SEARCH_SCHEMA,
         )
@@ -381,7 +381,7 @@ async def run_discovery_agent(
         return []
 
     # Phase 2: Evaluate — use full product list for context, but candidates are
-    # already annotated with matched_product_id from Phase 1
+    # already annotated with matched_product_ids from Phase 1
     discovered = await _evaluate_candidates(candidates, products, max_companies, ws_manager)
 
     return discovered
