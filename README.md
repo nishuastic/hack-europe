@@ -9,12 +9,22 @@ Built at HackEurope 2026 (24h hackathon).
 ## How It Works
 
 ```
-Products + Companies  →  Web Research (LinkUp)  →  AI Extraction (Claude)  →  Product Matching  →  Pitch Decks
+Company Name
+    ↓
+[Query Planner] ← Claude generates tailored search queries
+    ↓
+[Search Executor] ← LinkUp runs queries in parallel
+    ↓
+[Data Extractor] ← Claude extracts structured data + identifies gaps
+    ↓
+[Orchestrator] ← If important fields are missing, loops back (max 2 rounds)
+    ↓
+Enriched Lead → Product Matching → Pitch Deck
 ```
 
 1. Add your products to the catalog
 2. Paste a list of target companies
-3. Watch the spreadsheet fill in live as AI enriches each company (funding, industry, contacts, buying signals...)
+3. Watch the spreadsheet fill in live as the multi-agent pipeline enriches each company
 4. AI matches the best product to each company with a score + reasoning
 5. Generate a personalized pitch deck + outreach email for any match
 
@@ -89,6 +99,9 @@ curl -X POST http://localhost:8000/api/leads/import \
 # Check enrichment results
 curl http://localhost:8000/api/leads
 
+# Re-trigger enrichment for a single lead
+curl -X POST http://localhost:8000/api/leads/1/enrich
+
 # Watch live updates via WebSocket
 # (use websocat, Postman, or the frontend)
 # ws://localhost:8000/ws/updates
@@ -102,7 +115,7 @@ curl http://localhost:8000/api/leads
 uv run ruff check backend/                # Lint
 uv run ruff check backend/ --fix          # Auto-fix
 uv run mypy backend/                      # Type check
-uv run pytest backend/tests/ -v           # Unit tests (14 tests)
+uv run pytest backend/tests/ -v           # Unit tests (38 tests)
 ```
 
 All three must pass before committing.
@@ -117,18 +130,27 @@ hack-europe/
 │   ├── models.py               # SQLModel schemas (Lead, Product, etc.)
 │   ├── db.py                   # Async SQLite engine + sessions
 │   ├── enrichment/
-│   │   ├── linkup_search.py    # 5 parallel LinkUp searches per company
-│   │   ├── claude_enricher.py  # Claude structured JSON extraction
-│   │   └── pipeline.py         # Orchestrator: search → extract → save → broadcast
+│   │   ├── linkup_search.py    # LinkUp client singleton
+│   │   ├── pipeline.py         # Multi-agent orchestrator (iterative follow-up)
+│   │   └── agents/
+│   │       ├── query_planner.py    # Agent 1: Claude generates search queries
+│   │       ├── search_executor.py  # Agent 2: LinkUp parallel search
+│   │       └── data_extractor.py   # Agent 3: Claude extracts structured data
 │   └── tests/
-│       ├── conftest.py         # Test fixtures (in-memory DB, async client)
-│       ├── test_products.py    # Product CRUD tests
-│       ├── test_leads.py       # Lead import/list tests
-│       └── test_enrichment.py  # JSON parsing tests
+│       ├── conftest.py             # Test fixtures (in-memory DB, async client)
+│       ├── test_products.py        # Product CRUD tests
+│       ├── test_leads.py           # Lead import/list tests
+│       ├── test_enrichment.py      # JSON parsing + extraction model tests
+│       ├── test_query_planner.py   # Query planner agent tests
+│       ├── test_search_executor.py # Search executor agent tests
+│       └── test_pipeline.py        # Multi-round pipeline tests
 ├── prompts/                    # Prompt engineering (Person B)
 ├── frontend/                   # Next.js app (Person C+D)
 ├── docs/
-│   └── architecture.md         # System architecture + Mermaid diagrams
+│   ├── architecture.md         # System architecture + Mermaid diagrams
+│   ├── backend-tracker.md      # Person A progress
+│   ├── linkup-prompts-tracker.md  # Person B prompt specs
+│   └── frontend-pitch-tracker.md  # Person C+D progress
 ├── pyproject.toml
 └── .env.example
 ```
@@ -139,16 +161,16 @@ hack-europe/
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes | Claude API key for AI extraction + generation |
 | `LINKUP_API_KEY` | Yes | LinkUp API key for web research |
-| `ELEVENLABS_API_KEY` | Phase 3 | ElevenLabs key for voice briefings |
-| `STRIPE_SECRET_KEY` | Phase 3 | Stripe test key for billing |
+| `ELEVENLABS_API_KEY` | Later | ElevenLabs key for voice briefings |
+| `STRIPE_SECRET_KEY` | Later | Stripe test key for billing |
 
 ## Architecture
 
 See [`docs/architecture.md`](docs/architecture.md) for detailed diagrams including:
-- Phase 1 sequence diagram (what's working now)
-- Full system flowchart (Phases 1-3)
-- Enrichment pipeline detail
+- Multi-agent enrichment pipeline (3 agents + follow-up loop)
+- Full system flowchart
 - Agent orchestrator design
+- API contract
 
 ## License
 

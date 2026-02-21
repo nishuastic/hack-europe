@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from backend.db import get_session, init_db
-from backend.enrichment.pipeline import enrich_leads
+from backend.enrichment.pipeline import enrich_lead, enrich_leads
 from backend.models import EnrichmentStatus, Lead, Product
 
 logging.basicConfig(level=logging.INFO)
@@ -198,3 +198,22 @@ async def get_lead(lead_id: int, session: AsyncSession = Depends(get_session)):
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     return lead
+
+
+@app.post("/api/leads/{lead_id}/enrich")
+async def trigger_enrich(lead_id: int, session: AsyncSession = Depends(get_session)):
+    """Re-trigger enrichment for a single lead."""
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if lead.enrichment_status == EnrichmentStatus.IN_PROGRESS:
+        raise HTTPException(status_code=409, detail="Enrichment already in progress")
+
+    # Reset status
+    lead.enrichment_status = EnrichmentStatus.PENDING
+    session.add(lead)
+    await session.commit()
+
+    # Fire-and-forget
+    asyncio.create_task(enrich_lead(lead_id, manager))
+    return {"lead_id": lead_id, "status": "enrichment_started"}

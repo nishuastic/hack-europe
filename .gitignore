@@ -9,4 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
+# Secrets
 .env
+
+# Cache files
+*_cache
