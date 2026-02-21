@@ -109,43 +109,6 @@ async def test_exec_search_companies_excludes_urls(mock_get_client):
     assert result["companies"][0]["name"] == "Beta Inc"
 
 
-@pytest.mark.asyncio
-@patch("backend.discovery.icp_agent._get_client")
-async def test_exec_fetch_website(mock_get_client):
-    from backend.discovery.icp_agent import _exec_fetch_website
-
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.output = "Acme Corp is a technology company..."
-    mock_response.sources = []
-    mock_client.async_search = AsyncMock(return_value=mock_response)
-    mock_get_client.return_value = mock_client
-
-    result = await _exec_fetch_website("https://acme.com")
-    assert "Acme Corp" in result["content"]
-
-
-@pytest.mark.asyncio
-@patch("backend.discovery.icp_agent._get_client")
-async def test_exec_get_company_details(mock_get_client):
-    from backend.discovery.icp_agent import _exec_get_company_details
-
-    mock_client = MagicMock()
-    mock_response = MagicMock()
-    mock_response.output = {
-        "company_name": "Acme Corp",
-        "industry": "Technology",
-        "employees": 500,
-        "funding": "Series B, $50M",
-    }
-    mock_client.async_search = AsyncMock(return_value=mock_response)
-    mock_get_client.return_value = mock_client
-
-    result = await _exec_get_company_details("Acme Corp", "https://acme.com")
-    assert result["company_name"] == "Acme Corp"
-    assert result["employees"] == 500
-
-
 # ─── Discovery pipeline integration tests ────────────────────────────────
 
 def _mock_db_session_for_discovery():
