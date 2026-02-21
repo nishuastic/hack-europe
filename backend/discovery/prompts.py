@@ -88,7 +88,7 @@ queries that would find real companies matching that profile. Be specific and cr
 ## Rules
 
 - Aim for diversity: vary company sizes, sub-industries, geographies, and search angles.
-- Use "deep" depth for broad or exploratory queries, "standard" for specific/narrow ones.
+- Always use "standard" depth.
 - Include a brief `icp_rationale` for each query explaining what ICP it targets.
 - Each query MUST include a `product_id` field matching the Product ID shown above.
 - Do NOT include the selling company itself as a target.
