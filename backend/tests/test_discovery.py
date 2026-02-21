@@ -179,7 +179,7 @@ async def test_discovery_pipeline_creates_leads(mock_async_session, mock_agent, 
     ws_manager = AsyncMock()
 
     from backend.discovery.discovery_pipeline import run_discovery
-    await run_discovery(None, 5, ws_manager)
+    await run_discovery(None, 5, ws_manager, 1)
 
     # Verify agent was called
     mock_agent.assert_called_once()
@@ -210,7 +210,7 @@ async def test_discovery_pipeline_no_products(mock_async_session, mock_agent):
     ws_manager = AsyncMock()
 
     from backend.discovery.discovery_pipeline import run_discovery
-    await run_discovery(None, 5, ws_manager)
+    await run_discovery(None, 5, ws_manager, 1)
 
     mock_agent.assert_not_called()
 
@@ -231,7 +231,7 @@ async def test_discovery_pipeline_empty_results(mock_async_session, mock_agent, 
     ws_manager = AsyncMock()
 
     from backend.discovery.discovery_pipeline import run_discovery
-    await run_discovery(None, 5, ws_manager)
+    await run_discovery(None, 5, ws_manager, 1)
 
     broadcast_calls = ws_manager.broadcast.call_args_list
     message_types = [call[0][0]["type"] for call in broadcast_calls]

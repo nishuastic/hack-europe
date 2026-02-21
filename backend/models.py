@@ -23,6 +23,32 @@ class UserLinkedMixin(SQLModel):
     user_id: int = Field(foreign_key="user.id", index=True)
 
 
+class UsageEventType(str, Enum):
+    ENRICHMENT = "enrichment"
+    MATCHING = "matching"
+    PITCH_DECK = "pitch_deck"
+    EMAIL = "email"
+    VOICE = "voice"
+
+
+class UserCredits(SQLModel, table=True):
+    """Tracks a user's credit balance and billing IDs."""
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", unique=True, index=True)
+    credits_remaining: int = 100
+    paid_customer_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+
+
+class UsageEvent(SQLModel, table=True):
+    """Records each billable action for usage history."""
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    event_type: UsageEventType
+    credits_used: int
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class EnrichmentStatus(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"

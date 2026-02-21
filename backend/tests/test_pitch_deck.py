@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
 
 
-async def test_create_pitch_deck_lead_not_found(client: AsyncClient):
+async def test_create_pitch_deck_lead_not_found(authed_client: AsyncClient):
     """Test POST /api/leads/{id}/pitch-deck returns 404 for missing lead."""
-    resp = await client.post("/api/leads/999/pitch-deck", params={"product_id": 1})
+    resp = await authed_client.post("/api/leads/999/pitch-deck", params={"product_id": 1})
     assert resp.status_code == 404
 
 
