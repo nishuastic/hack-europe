@@ -103,11 +103,21 @@ function statusLabel(s: string) {
   return "Pending";
 }
 
+const GENERATION_STAGES = [
+  { icon: "inventory_2", text: "Analyzing your product catalog..." },
+  { icon: "travel_explore", text: "Searching for matching companies..." },
+  { icon: "filter_alt", text: "Filtering by ideal customer profile..." },
+  { icon: "query_stats", text: "Extracting key information about prospects..." },
+  { icon: "hub", text: "Identifying buying signals and contacts..." },
+  { icon: "auto_awesome", text: "Ranking and scoring matches..." },
+];
+
 export default function Dashboard({ onSelectLead }: DashboardProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [genStage, setGenStage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
 
@@ -164,25 +174,51 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
   }, []);
 
   const handleGenerate = async () => {
+    const leadCountBefore = leads.length;
     setGenerating(true);
+    setGenStage(0);
+
+    // Cycle through stage messages every 5 seconds
+    const stageInterval = setInterval(() => {
+      setGenStage((prev) => (prev + 1) % GENERATION_STAGES.length);
+    }, 5000);
+
     try {
       await api.runDiscovery();
-      // After discovery starts, periodically refresh leads as they come in
-      const interval = setInterval(() => {
-        api
-          .getLeads()
-          .then((newLeads) => {
-            if (newLeads.length > 0) setLeads(newLeads);
-          })
-          .catch(() => {});
-      }, 3000);
-      // Stop polling after 2 minutes
-      setTimeout(() => clearInterval(interval), 120000);
     } catch (err) {
       console.error("Discovery failed:", err);
-    } finally {
       setGenerating(false);
+      clearInterval(stageInterval);
+      return;
     }
+
+    // Poll for new leads — stop when we get new enriched ones or after 2 minutes
+    let completedCount = 0;
+    const pollInterval = setInterval(() => {
+      api
+        .getLeads()
+        .then((newLeads) => {
+          if (newLeads.length > 0) setLeads(newLeads);
+          // Count newly completed leads
+          completedCount = newLeads.filter(
+            (l) => l.enrichment_status === "complete"
+          ).length;
+          // If we got new leads and some are enriched, stop generating
+          if (newLeads.length > leadCountBefore && completedCount > 0) {
+            setGenerating(false);
+            clearInterval(stageInterval);
+            clearInterval(pollInterval);
+          }
+        })
+        .catch(() => {});
+    }, 3000);
+
+    // Hard timeout: stop after 2 minutes regardless
+    setTimeout(() => {
+      setGenerating(false);
+      clearInterval(stageInterval);
+      clearInterval(pollInterval);
+    }, 120000);
   };
 
   const filtered = leads.filter((l) => {
@@ -292,8 +328,32 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
         </div>
       </div>
 
+      {/* Generating banner */}
+      {generating && (
+        <div className="flex items-center gap-4 bg-slate-900 text-white px-5 py-4 rounded-lg animate-fadeIn">
+          <div className="size-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-[22px] animate-spin">progress_activity</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">AI Discovery Agent Running</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="material-symbols-outlined text-[16px] text-slate-400">{GENERATION_STAGES[genStage].icon}</span>
+              <p className="text-xs text-slate-400 transition-all duration-300">{GENERATION_STAGES[genStage].text}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {GENERATION_STAGES.map((_, i) => (
+              <div key={i} className={`h-1 w-4 rounded-full transition-all duration-300 ${i <= genStage ? 'bg-white/60' : 'bg-white/15'}`} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+      <div className={`bg-white border rounded-lg shadow-sm overflow-hidden relative transition-all duration-500 ${generating ? 'border-slate-300 ring-1 ring-slate-200' : 'border-slate-200'}`}>
+        {generating && (
+          <div className="absolute inset-0 animate-shimmer z-10 pointer-events-none" />
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-100">
             <thead>
@@ -328,6 +388,26 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
                     Loading leads...
                   </td>
                 </tr>
+              ) : generating && filtered.length === 0 ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <tr key={`skel-${i}`} className="animate-fadeIn" style={{ animationDelay: `${i * 150}ms`, animationFillMode: 'backwards' }}>
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded skeleton-bar" />
+                        <div className="space-y-1.5">
+                          <div className="h-3.5 w-28 skeleton-bar" />
+                          <div className="h-2.5 w-20 skeleton-bar" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3.5"><div className="h-3.5 w-20 skeleton-bar" /></td>
+                    <td className="px-6 py-3.5"><div className="h-3.5 w-16 skeleton-bar" /></td>
+                    <td className="px-6 py-3.5"><div className="h-3.5 w-24 skeleton-bar" /></td>
+                    <td className="px-6 py-3.5"><div className="h-3.5 w-16 skeleton-bar" /></td>
+                    <td className="px-6 py-3.5"><div className="flex gap-2"><div className="h-4 w-4 skeleton-bar rounded" /><div className="h-4 w-4 skeleton-bar rounded" /><div className="h-4 w-4 skeleton-bar rounded" /></div></td>
+                    <td className="px-6 py-3.5" />
+                  </tr>
+                ))
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
