@@ -1,11 +1,10 @@
-"""Tests for the multi-agent enrichment pipeline."""
+"""Tests for the enrichment pipeline — 2-round with single LinkUp call per round."""
 
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from backend.enrichment.agents.data_extractor import ExtractionResult, FieldConfidence
-from backend.enrichment.agents.query_planner import SearchPlan, SearchQuery
 from backend.enrichment.agents.search_executor import SearchResult
 from backend.enrichment.pipeline import _should_follow_up
 
@@ -53,18 +52,8 @@ def test_should_not_follow_up_no_gaps():
 
 # ─── Pipeline integration tests (all agents mocked) ───────────────────────
 
-def _make_plan(n_queries: int = 3) -> SearchPlan:
-    return SearchPlan(queries=[
-        SearchQuery(f"q{i}", "standard", "description", f"r{i}")
-        for i in range(n_queries)
-    ])
-
-
-def _make_search_results(n: int = 3) -> list[SearchResult]:
-    return [
-        SearchResult(f"field_{i}", f"q{i}", f"answer {i}", [], "standard")
-        for i in range(n)
-    ]
+def _make_search_result() -> SearchResult:
+    return SearchResult("all", "Stripe company overview", '{"description": "A payments company"}', [], "standard")
 
 
 def _make_extraction(gaps: list[str] | None = None) -> ExtractionResult:
@@ -102,12 +91,10 @@ def _mock_db_session(mock_lead):
 
 @pytest.mark.asyncio
 @patch("backend.enrichment.pipeline.extract_lead_data")
-@patch("backend.enrichment.pipeline.execute_searches")
-@patch("backend.enrichment.pipeline.plan_queries")
-async def test_pipeline_single_round(mock_plan, mock_search, mock_extract):
-    """Pipeline completes in 1 round when no important gaps."""
-    mock_plan.return_value = _make_plan()
-    mock_search.return_value = _make_search_results()
+@patch("backend.enrichment.pipeline.execute_single_enrichment_search")
+async def test_pipeline_single_round(mock_search, mock_extract):
+    """Pipeline completes in 1 round when no important gaps — only 1 LinkUp call."""
+    mock_search.return_value = _make_search_result()
     mock_extract.return_value = _make_extraction(gaps=[])
 
     ws_manager = AsyncMock()
@@ -125,7 +112,6 @@ async def test_pipeline_single_round(mock_plan, mock_search, mock_extract):
         from backend.enrichment.pipeline import enrich_lead
         await enrich_lead(1, ws_manager)
 
-    mock_plan.assert_called_once()
     mock_search.assert_called_once()
     mock_extract.assert_called_once()
 
@@ -138,12 +124,10 @@ async def test_pipeline_single_round(mock_plan, mock_search, mock_extract):
 
 @pytest.mark.asyncio
 @patch("backend.enrichment.pipeline.extract_lead_data")
-@patch("backend.enrichment.pipeline.execute_searches")
-@patch("backend.enrichment.pipeline.plan_queries")
-async def test_pipeline_two_rounds(mock_plan, mock_search, mock_extract):
-    """Pipeline does 2 rounds when first round has important gaps."""
-    mock_plan.return_value = _make_plan()
-    mock_search.return_value = _make_search_results()
+@patch("backend.enrichment.pipeline.execute_single_enrichment_search")
+async def test_pipeline_two_rounds(mock_search, mock_extract):
+    """Pipeline does 2 rounds when first round has important gaps — 2 LinkUp calls total."""
+    mock_search.return_value = _make_search_result()
 
     extraction_with_gaps = _make_extraction(
         gaps=["contacts", "buying_signals"],
@@ -166,7 +150,6 @@ async def test_pipeline_two_rounds(mock_plan, mock_search, mock_extract):
         from backend.enrichment.pipeline import enrich_lead
         await enrich_lead(1, ws_manager)
 
-    assert mock_plan.call_count == 2
     assert mock_search.call_count == 2
     assert mock_extract.call_count == 2
 
