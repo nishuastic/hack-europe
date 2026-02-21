@@ -1,4 +1,4 @@
-"""SalesForge data models — SQLModel schemas for leads, enrichments, and pitch decks."""
+"""SalesForge data models — SQLModel schemas for leads, enrichments, product matching, and pitch decks."""
 
 from datetime import datetime
 from enum import Enum
@@ -30,6 +30,13 @@ class PitchSlide(SQLModel):
     speaker_notes: str
 
 
+class BuyingSignal(SQLModel):
+    """A structured buying signal extracted from enrichment data."""
+    signal_type: str        # "recent_funding", "hiring_surge", "competitor_mentioned", "expansion", "pain_indicator", "tech_stack_match"
+    description: str        # "Raised $45M Series B in Jan 2024"
+    strength: str           # "strong", "moderate", "weak"
+
+
 class Lead(SQLModel, table=True):
     """A target company to enrich and pitch."""
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -47,11 +54,7 @@ class Lead(SQLModel, table=True):
     employees: Optional[int] = None
     contacts: Optional[list[Contact]] = Field(default=None, sa_column=Column(JSON))
     customers: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
-    fit_score: Optional[float] = None
-    fit_reasoning: Optional[str] = None
-
-    # Gemini visual analysis (Phase 3)
-    brand_analysis: Optional[str] = None
+    buying_signals: Optional[list[BuyingSignal]] = Field(default=None, sa_column=Column(JSON))
 
     # Status tracking
     enrichment_status: EnrichmentStatus = EnrichmentStatus.PENDING
@@ -62,32 +65,56 @@ class Lead(SQLModel, table=True):
     voice_generated: bool = False
 
 
-class PitchDeck(SQLModel, table=True):
-    """A generated pitch deck for a lead."""
+class Product(SQLModel, table=True):
+    """A product in the user's catalog — matched against leads by AI."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str
+    description: str  # What you sell, clear simple description
+    features: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))  # Main product/service features
+    industry_focus: Optional[str] = None  # Industry target if any
+    pricing_model: Optional[str] = None  # SaaS, project-based, retainer, etc.
+    company_size_target: Optional[str] = None  # SMB, mid-market, enterprise
+    geography: Optional[str] = None  # Regions served
+    stage: Optional[str] = None  # startup, scaling, enterprise
+    company_name: Optional[str] = None  # The selling company's name
+    website: Optional[str] = None  # Seller's website
+    example_clients: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))  # Reference clients
+    differentiator: Optional[str] = None  # What makes it special / USP
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ProductMatch(SQLModel, table=True):
+    """AI-generated match between a Lead and a Product with score and reasoning."""
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
+    product_id: int = Field(foreign_key="product.id")
+    match_score: float  # 1-10
+    match_reasoning: str  # Why this product fits this lead
+    conversion_likelihood: Optional[str] = None   # "high", "medium", "low"
+    conversion_reasoning: Optional[str] = None     # "Similar profile to 3 known converters..."
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PitchDeck(SQLModel, table=True):
+    """A generated pitch deck for a specific product-lead pair."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    lead_id: int = Field(foreign_key="lead.id")
+    product_id: int = Field(foreign_key="product.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     slides: list[PitchSlide] = Field(sa_column=Column(JSON))
     pptx_path: Optional[str] = None  # Path to generated PPTX file
 
 
 class GeneratedEmail(SQLModel, table=True):
-    """A generated outreach email for a lead."""
+    """A generated outreach email for a specific product-lead pair."""
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
+    product_id: int = Field(foreign_key="product.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     contact_name: str
     contact_role: str
     subject: str
     body: str
-
-
-class Product(SQLModel, table=True):
-    """The user's product description — used to personalize everything."""
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str
-    description: str
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class VoiceBriefing(SQLModel, table=True):

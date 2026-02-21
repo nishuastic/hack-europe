@@ -4,9 +4,10 @@
 You are the **data quality gatekeeper**. The entire product is only as good as the data we extract. Your job:
 1. Craft and optimize LinkUp search queries for each enrichment field
 2. Design Claude prompts that extract structured data reliably
-3. Design the pitch deck generation prompt (most important prompt in the app)
-4. Test everything across 20+ companies and score quality
-5. Deliver tested prompts in `prompts/` that Person A imports directly
+3. Design the **product-matching prompt** (scores each product's fit per company)
+4. Design the pitch deck generation prompt (now product-specific per lead)
+5. Test everything across 20+ companies and score quality
+6. Deliver tested prompts in `prompts/` that Person A imports directly
 
 ## Your Stack
 - **Python 3.12** + **uv**
@@ -55,7 +56,7 @@ result = client.search(
 ### Files to Create
 - [ ] `prompts/__init__.py`
 - [ ] `prompts/linkup_queries.py` — query templates per field
-- [ ] `prompts/claude_prompts.py` — Claude system prompts for extraction
+- [ ] `prompts/claude_prompts.py` — Claude system prompts for extraction + matching
 - [ ] `prompts/test_prompts.py` — test harness
 
 ### LinkUp Queries to Optimize
@@ -110,7 +111,7 @@ def get_queries(company_name: str, company_url: str | None = None) -> dict[str, 
     }
 ```
 
-### Claude Extraction Prompt
+### Claude Extraction Prompt (updated — no fit_score, enrichment only)
 ```python
 # prompts/claude_prompts.py
 
@@ -124,14 +125,64 @@ extract structured data. Return ONLY valid JSON matching this schema:
   "revenue": "Estimated revenue or ARR. 'Unknown' if not found.",
   "employees": number or null,
   "contacts": [{"name": "...", "role": "...", "linkedin": "...or null"}],
-  "customers": ["Customer1", "Customer2"],
-  "fit_score": 1-10,
-  "fit_reasoning": "2-sentence explanation of product-customer fit"
+  "customers": ["Customer1", "Customer2"]
 }
 
 Be specific. Use real numbers. If data isn't available, say 'Unknown' — never fabricate.
-The product we are selling: {product_description}
-Score fit based on how well our product addresses this company's likely needs.
+
+Also extract buying signals — structured indicators of purchase intent:
+  "buying_signals": [
+    {
+      "signal_type": "recent_funding | hiring_surge | competitor_mentioned | expansion | pain_indicator | tech_stack_match",
+      "description": "Specific evidence, e.g. 'Raised $45M Series B in Jan 2024'",
+      "strength": "strong | moderate | weak"
+    }
+  ]
+
+Signal types:
+- recent_funding: Recent fundraise = budget available
+- hiring_surge: Growing headcount = needs tools/infrastructure
+- competitor_mentioned: Uses a competitor product = switching opportunity
+- expansion: New market, geo, or product launch = needs support
+- pain_indicator: Negative press, layoffs, tech debt mentions
+- tech_stack_match: Their stack aligns with product's target tech
+
+Extract ALL signals you can find evidence for. Empty array if none found.
+"""
+```
+
+### Product-Matching Prompt (NEW)
+```python
+# prompts/claude_prompts.py
+
+PRODUCT_MATCHING_PROMPT = """You are a senior sales strategist. Given an enriched company profile and a catalog of products,
+score how well each product fits this company as a potential customer.
+
+Company profile:
+{enriched_data}
+
+Product catalog:
+{product_catalog}
+
+For EACH product, return a JSON array:
+[
+  {
+    "product_id": <id>,
+    "match_score": 1-10,
+    "match_reasoning": "2-3 sentence explanation of why this product does or doesn't fit this company"
+  }
+]
+
+Scoring guide:
+- 9-10: Near-perfect fit — company's industry, size, and pain points align exactly with the product
+- 7-8: Strong fit — clear use case, minor gaps
+- 5-6: Moderate fit — some alignment but not an obvious match
+- 3-4: Weak fit — product could theoretically help but it's a stretch
+- 1-2: Poor fit — no meaningful alignment
+
+Consider: industry alignment, company size vs. product's target market, likely pain points vs. product features,
+geography, stage, and whether the company already uses competing solutions (from their customer/tech data).
+Be honest — not every product fits every company. A score of 3 is fine if it's accurate.
 """
 ```
 
@@ -167,9 +218,16 @@ TEST_COMPANIES = [
 
 ---
 
-## Phase 2 — Pitch Deck Prompt (Hours 8-14)
+## Phase 2 — Product Matching + Pitch Deck Prompt (Hours 8-14)
 
-### The Most Important Prompt
+### Product-Matching Prompt (critical new deliverable)
+The matching prompt is now a core piece of the pipeline. It runs after enrichment and before any actions.
+- Test with 3-5 different products against 10+ companies
+- Verify scores are well-distributed (not all 8s — some should be 3s and 4s)
+- Verify reasoning is specific and references actual enrichment data
+- Edge cases: what if a product has no industry_focus? What if a company has minimal enrichment data?
+
+### The Pitch Deck Prompt (updated — now product-specific)
 This is our killer feature. The pitch deck prompt must produce slides that feel like a human consultant wrote them.
 
 ### File to Create
@@ -182,8 +240,9 @@ This is our killer feature. The pitch deck prompt must produce slides that feel 
 PITCH_DECK_SYSTEM_PROMPT = """You are an elite sales consultant creating a personalized pitch deck.
 
 Given:
-- Our product: {product_description}
+- Our product: {product_profile}  (name, description, features, differentiator, etc.)
 - Target company enrichment data: {enriched_data}
+- Match analysis: {match_reasoning}
 
 Generate a 7-slide pitch deck as JSON. Each slide:
 {{
@@ -204,23 +263,24 @@ SLIDES:
    - Derived from industry analysis + company specifics
    - Be precise, not generic
 
-4. OUR SOLUTION: How our product maps to their challenges
-   - Feature → pain point mapping
+4. OUR SOLUTION: How {product_name} maps to their challenges
+   - Feature → pain point mapping (use actual product features)
    - Quantify impact where possible (save X hours, reduce Y cost)
 
-5. FIT ANALYSIS: Why they're an ideal customer
-   - Reference similar companies using our type of product
+5. FIT ANALYSIS: Why they're an ideal customer for this specific product
+   - Reference the match reasoning
    - Industry-specific alignment
 
 6. SOCIAL PROOF: Companies like them already benefiting
+   - Reference product's example_clients if available
    - If we have data on similar customers, reference them
 
 7. NEXT STEPS: Clear CTA
    - Suggested meeting agenda
-   - "Let's explore how we can help {company_name} with {specific_challenge}"
+   - "Let's explore how {product_name} can help {company_name} with {specific_challenge}"
 
 RULES:
-- Every claim must trace back to the enrichment data
+- Every claim must trace back to the enrichment data or product profile
 - No generic filler — if you don't have data, say something specific about the industry
 - Body HTML should be clean: use <p>, <ul>, <li>, <strong> only
 - Speaker notes should be conversational, 2-3 sentences
@@ -229,11 +289,12 @@ RULES:
 EMAIL_SYSTEM_PROMPT = """You are writing a cold outreach email to {contact_name}, {contact_role} at {company_name}.
 
 Context: {enriched_data}
-Our product: {product_description}
+Product being pitched: {product_profile}
+Why this product fits them: {match_reasoning}
 
 Write a short (5-7 sentences) personalized email that:
 - Opens with something specific about THEIR company (recent funding, product launch, challenge)
-- Connects it to what we do in ONE sentence
+- Connects it to what {product_name} does in ONE sentence
 - Proposes a specific value ("save X", "improve Y")
 - Ends with low-friction CTA (15-min call, not a demo)
 - Tone: professional but human, not salesy
@@ -242,52 +303,73 @@ Return JSON: {{"subject": "...", "body": "..."}}
 """
 ```
 
+### Conversion Prediction Prompt (NEW — Data Prize)
+```python
+# prompts/claude_prompts.py
+
+CONVERSION_PREDICTION_PROMPT = """You are a senior sales analytics expert. Given a dataset of enriched leads with their buying signals, product match scores, and product details, predict which leads are most likely to convert into customers.
+
+Dataset:
+{dataset}
+
+For EACH lead-product match, return:
+[
+  {{
+    "lead_id": <id>,
+    "product_id": <id>,
+    "conversion_likelihood": "high" | "medium" | "low",
+    "conversion_reasoning": "1-2 sentence explanation of why"
+  }}
+]
+
+Pattern analysis guidelines:
+- Companies with recent_funding + hiring_surge signals are high-intent buyers
+- Companies already using competitor products (competitor_mentioned) are switching opportunities
+- High match_score (7+) + strong buying signals = "high" conversion likelihood
+- Look for clusters: "companies in fintech with 50-200 employees that recently raised tend to convert"
+- Companies with pain_indicator signals + strong product fit = urgent need
+- Consider the product's example_clients — similar companies to existing clients convert better
+
+Be data-driven. Reference specific signals and scores in your reasoning.
+"""
+```
+
 ### Testing the Pitch Deck Prompt
-- Generate decks for 5 very different companies (startup, enterprise, different industries)
+- Generate decks for 5 very different companies × 2-3 different products
 - Score each slide: specific (1-5) + actionable (1-5) + accurate (1-5)
 - Iterate until average > 4.0 per slide
 - Test edge cases: what if we have minimal data? Does the prompt degrade gracefully?
+- Test: does the deck feel different when pitching Product A vs Product B to the same company?
 
 ### Deliverable by Hour 14
-- Pitch deck prompt producing high-quality slides for any company type
-- Email prompt producing personalized, non-generic outreach
-- Both tested across 10+ companies
+- Product-matching prompt producing well-distributed, specific scores
+- Pitch deck prompt producing high-quality, product-specific slides for any company type
+- Email prompt producing personalized, product-specific outreach
+- All tested across 10+ companies × multiple products
 
 ---
 
-## Phase 3 — Voice Script + Gemini Prompts (Hours 14-20)
+## Phase 3 — Voice Script Prompt (Hours 14-20)
 
 ### ElevenLabs Voice Script Prompt
 ```python
 VOICE_BRIEFING_PROMPT = """Create a 30-second spoken briefing to prepare a salesperson for a call with {company_name}.
 
 Data: {enriched_data}
+Product to pitch: {product_name}
+Match reasoning: {match_reasoning}
 
 Format: conversational, like a colleague briefing you in the elevator.
-Include: key decision maker name, what the company does, their main pain point, your opening angle.
+Include: key decision maker name, what the company does, their main pain point, which product to pitch and why, your opening angle.
 Keep under 80 words (≈30 seconds spoken).
-"""
-```
-
-### Gemini Website Analysis Prompt
-```python
-GEMINI_WEBSITE_PROMPT = """Analyze this screenshot of {company_name}'s website ({url}).
-
-Extract:
-1. Brand positioning: how do they present themselves?
-2. Target audience: who is this website designed for?
-3. Product maturity: startup/growth/enterprise feel?
-4. Technology signals: any tech stack indicators visible?
-5. Design quality: professional/amateur/enterprise grade?
-
-Return JSON with these 5 fields. Be specific and observational.
 """
 ```
 
 ---
 
 ## Phase 4 — Quality Pass (Hours 20-24)
-- [ ] Run all prompts against 5 demo companies, fix any issues
+- [ ] Run all prompts against 5 demo companies × 3 demo products, fix any issues
+- [ ] Ensure product matches are well-calibrated for demo data
 - [ ] Ensure pitch decks are flawless for demo companies
 - [ ] Prepare 3 backup pitch decks (pre-generated) in case API is slow during demo
 - [ ] Review all Claude outputs for hallucination — flag any and add guardrails
