@@ -144,10 +144,6 @@ class LeadImport(BaseModel):
     companies: list[str]
 
 
-class AgentRequest(BaseModel):
-    task: str
-
-
 # ─── Product CRUD ─────────────────────────────────────────────────────
 
 
@@ -470,14 +466,3 @@ async def trigger_predictions(session: AsyncSession = Depends(get_session)):
 
     asyncio.create_task(predict_conversions(manager, session))
     return {"status": "prediction_started"}
-
-
-# ─── Agent Orchestrator ──────────────────────────────────────────────
-
-@app.post("/api/agent/run")
-async def run_agent_endpoint(body: AgentRequest):
-    """Run the autonomous agent. Fire-and-forget, results stream via WebSocket."""
-    from backend.agent.orchestrator import run_agent
-
-    asyncio.create_task(run_agent(body.task, manager))
-    return {"status": "agent_started", "task": body.task}
