@@ -3,10 +3,12 @@
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -14,7 +16,15 @@ from sqlmodel import select
 from backend.db import get_session, init_db
 from backend.discovery.discovery_pipeline import run_discovery
 from backend.enrichment.pipeline import enrich_lead, enrich_leads
-from backend.models import CompanyProfile, EnrichmentStatus, Lead, Product
+from backend.models import (
+    CompanyProfile,
+    EnrichmentStatus,
+    GeneratedEmail,
+    Lead,
+    PitchDeck,
+    Product,
+    ProductMatch,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -56,7 +66,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SalesForge", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="SalesForge", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -132,6 +142,10 @@ class CompanyProfileUpsert(BaseModel):
 
 class LeadImport(BaseModel):
     companies: list[str]
+
+
+class AgentRequest(BaseModel):
+    task: str
 
 
 # ─── Product CRUD ─────────────────────────────────────────────────────
@@ -275,3 +289,195 @@ async def trigger_enrich(lead_id: int, session: AsyncSession = Depends(get_sessi
     # Fire-and-forget
     asyncio.create_task(enrich_lead(lead_id, manager))
     return {"lead_id": lead_id, "status": "enrichment_started"}
+
+
+# ─── Product Matching ─────────────────────────────────────────────────
+
+@app.post("/api/matches/generate")
+async def trigger_matching():
+    """Generate matches for all enriched leads against all products. Fire-and-forget."""
+    from backend.matching.pipeline import generate_all_matches
+
+    asyncio.create_task(generate_all_matches(manager))
+    return {"status": "matching_started"}
+
+
+@app.get("/api/matches")
+async def list_matches(
+    lead_id: int | None = Query(default=None),
+    product_id: int | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+):
+    """List matches with optional lead_id and product_id filters."""
+    query = select(ProductMatch)
+    if lead_id is not None:
+        query = query.where(ProductMatch.lead_id == lead_id)
+    if product_id is not None:
+        query = query.where(ProductMatch.product_id == product_id)
+    query = query.order_by(ProductMatch.match_score.desc())  # type: ignore[attr-defined]
+    result = await session.execute(query)
+    return {"matches": result.scalars().all()}
+
+
+# ─── Pitch Deck ───────────────────────────────────────────────────────
+
+@app.post("/api/leads/{lead_id}/pitch-deck")
+async def create_pitch_deck(
+    lead_id: int,
+    product_id: int = Query(...),
+    session: AsyncSession = Depends(get_session),
+):
+    """Generate a pitch deck for a lead-product pair. Awaited (not fire-and-forget)."""
+    from backend.actions.pitch_deck import generate_pitch_deck
+
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Get match reasoning if available
+    match_obj = (await session.execute(
+        select(ProductMatch).where(
+            ProductMatch.lead_id == lead_id,
+            ProductMatch.product_id == product_id,
+        )
+    )).scalar_one_or_none()
+    reasoning = match_obj.match_reasoning if match_obj else "No prior match — generate general pitch."
+
+    result = await generate_pitch_deck(lead, product, reasoning)
+
+    # Save to DB
+    deck = PitchDeck(
+        lead_id=lead_id,
+        product_id=product_id,
+        slides=result["slides"],
+        pptx_path=result["pptx_path"],
+    )
+    session.add(deck)
+    lead.pitch_deck_generated = True
+    session.add(lead)
+    await session.commit()
+    await session.refresh(deck)
+
+    return {"pitch_deck_id": deck.id, "slides": result["slides"], "pptx_path": result["pptx_path"]}
+
+
+@app.get("/api/leads/{lead_id}/pitch-deck")
+async def get_pitch_deck(
+    lead_id: int,
+    product_id: int | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+):
+    """Get existing pitch deck for a lead (optionally filtered by product)."""
+    query = select(PitchDeck).where(PitchDeck.lead_id == lead_id)
+    if product_id is not None:
+        query = query.where(PitchDeck.product_id == product_id)
+    query = query.order_by(PitchDeck.created_at.desc())  # type: ignore[attr-defined]
+    deck = (await session.execute(query)).scalar_one_or_none()
+    if not deck:
+        raise HTTPException(status_code=404, detail="Pitch deck not found")
+    return deck
+
+
+@app.get("/api/leads/{lead_id}/pitch-deck/download")
+async def download_pitch_deck(
+    lead_id: int,
+    product_id: int | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+):
+    """Download the PPTX file for a pitch deck."""
+    query = select(PitchDeck).where(PitchDeck.lead_id == lead_id)
+    if product_id is not None:
+        query = query.where(PitchDeck.product_id == product_id)
+    query = query.order_by(PitchDeck.created_at.desc())  # type: ignore[attr-defined]
+    deck = (await session.execute(query)).scalar_one_or_none()
+    if not deck or not deck.pptx_path:
+        raise HTTPException(status_code=404, detail="Pitch deck PPTX not found")
+    if not os.path.exists(deck.pptx_path):
+        raise HTTPException(status_code=404, detail="PPTX file missing from disk")
+    return FileResponse(
+        deck.pptx_path,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        filename=f"pitch_{lead_id}_{deck.product_id}.pptx",
+    )
+
+
+# ─── Email Generator ─────────────────────────────────────────────────
+
+@app.post("/api/leads/{lead_id}/email")
+async def create_email(
+    lead_id: int,
+    product_id: int = Query(...),
+    session: AsyncSession = Depends(get_session),
+):
+    """Generate an outreach email for a lead-product pair."""
+    from backend.actions.email_generator import generate_email
+
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    product = (await session.execute(select(Product).where(Product.id == product_id))).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Get match reasoning
+    match_obj = (await session.execute(
+        select(ProductMatch).where(
+            ProductMatch.lead_id == lead_id,
+            ProductMatch.product_id == product_id,
+        )
+    )).scalar_one_or_none()
+    reasoning = match_obj.match_reasoning if match_obj else ""
+
+    result = await generate_email(lead, product, reasoning)
+
+    # Save to DB
+    email_record = GeneratedEmail(
+        lead_id=lead_id,
+        product_id=product_id,
+        contact_name=result["contact_name"],
+        contact_role=result["contact_role"],
+        subject=result["subject"],
+        body=result["body"],
+    )
+    session.add(email_record)
+    lead.email_generated = True
+    session.add(lead)
+    await session.commit()
+    await session.refresh(email_record)
+
+    return email_record
+
+
+# ─── Analytics ────────────────────────────────────────────────────────
+
+@app.get("/api/analytics")
+async def get_analytics_endpoint(session: AsyncSession = Depends(get_session)):
+    """Get analytics dashboard data."""
+    from backend.analytics import get_analytics
+
+    return await get_analytics(session)
+
+
+@app.post("/api/analytics/predict")
+async def trigger_predictions(session: AsyncSession = Depends(get_session)):
+    """Predict conversion likelihood for matches missing predictions."""
+    from backend.analytics import predict_conversions
+
+    asyncio.create_task(predict_conversions(manager, session))
+    return {"status": "prediction_started"}
+
+
+# ─── Agent Orchestrator ──────────────────────────────────────────────
+
+@app.post("/api/agent/run")
+async def run_agent_endpoint(body: AgentRequest):
+    """Run the autonomous agent. Fire-and-forget, results stream via WebSocket."""
+    from backend.agent.orchestrator import run_agent
+
+    asyncio.create_task(run_agent(body.task, manager))
+    return {"status": "agent_started", "task": body.task}
