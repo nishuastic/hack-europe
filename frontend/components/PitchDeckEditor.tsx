@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 
 interface PitchDeckEditorProps {
   leadId: number;
+  productId?: number;
   onBack: () => void;
 }
 
@@ -17,6 +18,7 @@ const SLIDES = [
 
 export default function PitchDeckEditor({
   leadId,
+  productId,
   onBack,
 }: PitchDeckEditorProps) {
   const [activeSlide, setActiveSlide] = useState(1);
@@ -25,7 +27,7 @@ export default function PitchDeckEditor({
   const handleExport = async () => {
     setExporting(true);
     try {
-      const blob = await api.downloadPitchDeck(leadId);
+      const blob = await api.downloadPitchDeck(leadId, productId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

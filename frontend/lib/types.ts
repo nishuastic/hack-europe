@@ -4,4 +4,4 @@ export type AppView =
   | { page: 'products' }
   | { page: 'product-edit'; productId?: number }
   | { page: 'lead-detail'; leadId: number }
-  | { page: 'pitch-editor'; leadId: number };
+  | { page: 'pitch-editor'; leadId: number; productId?: number };
