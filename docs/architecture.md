@@ -64,36 +64,206 @@ hack-europe/
 └── .env.example
 ```
 
-## Data Flow
+## Phase 1 — What's Built Now
+
+This is the current working system. Everything below is **implemented and tested**.
+
+```mermaid
+sequenceDiagram
+    participant U as User / Frontend
+    participant API as FastAPI (main.py)
+    participant DB as SQLite
+    participant WS as WebSocket
+    participant LU as LinkUp SDK
+    participant CL as Claude Sonnet
+
+    Note over U,CL: ── Step 1: Add Products ──
+    U->>API: POST /api/products {products: [...]}
+    API->>DB: Insert Product rows
+    API-->>U: 200 OK {products: [...]}
+
+    Note over U,CL: ── Step 2: Import Leads ──
+    U->>API: POST /api/leads/import {companies: ["Stripe","Plaid"]}
+    API->>DB: Insert Lead rows (status: PENDING)
+    API-->>U: 200 OK {lead_ids, status: "enrichment_started"}
+
+    Note over U,CL: ── Step 3: Background Enrichment (fire-and-forget) ──
+    API-)API: asyncio.create_task(enrich_leads)
+    Note right of API: Semaphore(3) limits concurrency
+
+    loop For each lead (max 3 parallel)
+        API->>DB: Set status → IN_PROGRESS
+        API->>WS: {type: "enrichment_start", lead_id}
+
+        par 5 parallel LinkUp searches
+            API->>LU: overview query
+            API->>LU: funding query
+            API->>LU: leadership query
+            API->>LU: customers query
+            API->>LU: news query
+        end
+        LU-->>API: Raw text results (5 answers)
+
+        API->>CL: "Extract structured data from this research"
+        Note right of CL: System prompt defines JSON schema
+        CL-->>API: JSON {description, funding, industry, ...}
+
+        loop For each extracted field
+            API->>DB: UPDATE lead SET field = value
+            API->>WS: {type: "cell_update", lead_id, field, value}
+            Note right of WS: 150ms delay between fields<br/>for visual streaming effect
+        end
+
+        API->>DB: Set status → COMPLETE
+        API->>WS: {type: "enrichment_complete", lead_id}
+    end
+
+    Note over U,CL: ── Step 4: User reads results ──
+    U->>API: GET /api/leads
+    API->>DB: SELECT * FROM lead
+    API-->>U: {leads: [{company_name, description, funding, ...}]}
 ```
-User inputs product catalog + pastes company list
-    │
-    ▼
-POST /api/products ──▶ FastAPI saves products to SQLite
-POST /api/leads/import ──▶ FastAPI saves leads to SQLite
-    │
-    ▼
-Enrichment Pipeline (async, per lead):
-    1. LinkUp search (company info, funding, contacts, customers)
-    2. Claude analysis (structure data, extract pain points)
-    │
-    ├── WebSocket pushes cell updates to frontend in real-time
-    │
-    ▼
-Matching Pipeline (after enrichment):
-    POST /api/matches/generate
-    Claude analyzes each enriched lead against ALL products
-    → Outputs ranked ProductMatch records (score + reasoning per pair)
-    │
-    ├── WebSocket pushes match updates to frontend
-    │
-    ▼
-User clicks row → Action Panel (shows best-matched product):
-    • Generate Pitch Deck for matched product-lead pair
-    • Draft Email referencing the matched product
-    │
-    ▼
-All actions metered via Stripe [Phase 3]
+
+## Full System — Phase 1 through 3
+
+This shows the complete planned pipeline. Boxes marked with checkmarks are built.
+
+```mermaid
+flowchart TB
+    subgraph INPUT["📥 User Input"]
+        P[Add Products to Catalog]
+        L[Paste Company Names]
+    end
+
+    subgraph PHASE1["Phase 1 — Enrichment ✅ BUILT"]
+        direction TB
+        DB_W1[(SQLite)]
+        ENRICH["Enrichment Pipeline<br/>(pipeline.py)"]
+        LINKUP["LinkUp SDK<br/>5 parallel searches/company<br/>(linkup_search.py)"]
+        CLAUDE_E["Claude Sonnet<br/>Structured extraction<br/>(claude_enricher.py)"]
+        WS1["WebSocket<br/>cell_update events"]
+    end
+
+    subgraph PHASE2["Phase 2 — Matching + Actions 🔜 NEXT"]
+        direction TB
+        MATCH["Product Matching<br/>Claude scores Lead × Product"]
+        PREDICT["Conversion Prediction<br/>Claude identifies patterns"]
+        DECK["Pitch Deck Generator<br/>Claude → JSON → HTML/PPTX"]
+        EMAIL["Email Generator<br/>Personalized outreach"]
+        AGENT["Agent Orchestrator<br/>Claude tool-use loop"]
+        WS2["WebSocket<br/>match_update events"]
+    end
+
+    subgraph PHASE3["Phase 3 — Integrations 🔮 LATER"]
+        VOICE["ElevenLabs<br/>Voice briefing"]
+        STRIPE["Stripe<br/>Usage-based billing"]
+        ANALYTICS["Analytics Dashboard<br/>Industry breakdown, signals"]
+    end
+
+    subgraph OUTPUT["📤 Output"]
+        GRID["AG Grid Spreadsheet<br/>Live-updating cells"]
+        PANEL["Action Panel<br/>Deck + Email + Voice"]
+    end
+
+    P --> DB_W1
+    L --> DB_W1
+    DB_W1 --> ENRICH
+    ENRICH --> LINKUP
+    LINKUP --> CLAUDE_E
+    CLAUDE_E --> DB_W1
+    CLAUDE_E --> WS1
+    WS1 --> GRID
+
+    DB_W1 --> MATCH
+    MATCH --> PREDICT
+    MATCH --> WS2
+    WS2 --> GRID
+    MATCH --> DECK
+    MATCH --> EMAIL
+    AGENT -.->|"calls as tools"| MATCH
+    AGENT -.->|"calls as tools"| DECK
+    AGENT -.->|"calls as tools"| EMAIL
+
+    DECK --> PANEL
+    EMAIL --> PANEL
+    VOICE --> PANEL
+    STRIPE -.->|"meters all actions"| PHASE2
+    ANALYTICS --> GRID
+
+    style PHASE1 fill:#1a3a1a,stroke:#4ade80,stroke-width:2px
+    style PHASE2 fill:#1a2a3a,stroke:#60a5fa,stroke-width:2px
+    style PHASE3 fill:#2a1a2a,stroke:#c084fc,stroke-width:2px
+```
+
+## Enrichment Pipeline Detail
+
+How a single lead gets enriched — this is the core loop running today.
+
+```mermaid
+flowchart LR
+    subgraph SEARCH["LinkUp Searches (parallel)"]
+        S1["🔍 Overview"]
+        S2["🔍 Funding"]
+        S3["🔍 Leadership"]
+        S4["🔍 Customers"]
+        S5["🔍 News"]
+    end
+
+    subgraph EXTRACT["Claude Extraction"]
+        CE["Claude Sonnet<br/>JSON extraction"]
+    end
+
+    subgraph FIELDS["Extracted Fields (broadcast 1-by-1)"]
+        F1["description"]
+        F2["industry"]
+        F3["funding"]
+        F4["revenue"]
+        F5["employees"]
+        F6["contacts"]
+        F7["customers"]
+        F8["buying_signals"]
+    end
+
+    LEAD["Lead<br/>(PENDING)"] --> SEARCH
+    S1 & S2 & S3 & S4 & S5 --> CE
+    CE --> F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8
+    F1 & F2 & F3 & F4 & F5 & F6 & F7 & F8 -->|"save + WS push"| DONE["Lead<br/>(COMPLETE)"]
+
+    style LEAD fill:#854d0e,stroke:#fbbf24
+    style DONE fill:#166534,stroke:#4ade80
+```
+
+## Agent Orchestrator — Phase 2 Design (not built yet)
+
+This is the planned agentic loop for the "Agentic AI" prize. **Tell me what you want changed.**
+
+```mermaid
+flowchart TB
+    USER["User request<br/>'Research and pitch Stripe'"] --> AGENT
+
+    subgraph AGENT["Agent Orchestrator (Claude tool-use loop)"]
+        THINK["Claude decides<br/>which tool to call next"]
+        THINK -->|"tool_use"| TOOLS
+        TOOLS -->|"result"| THINK
+        THINK -->|"no more tools"| DONE["Return final answer"]
+    end
+
+    subgraph TOOLS["Available Tools"]
+        T1["search_web(query)<br/>→ LinkUp"]
+        T2["analyze_company(lead_id)<br/>→ Enrichment pipeline"]
+        T3["match_products(lead_id)<br/>→ Score all products"]
+        T4["generate_pitch_deck(lead_id, product_id)<br/>→ HTML/PPTX slides"]
+        T5["draft_email(lead_id, product_id)<br/>→ Outreach email"]
+        T6["re_evaluate(lead_id, new_info)<br/>→ Update analysis"]
+    end
+
+    THINK -.->|"Step 1"| T2
+    THINK -.->|"Step 2"| T3
+    THINK -.->|"Step 3"| T4
+    THINK -.->|"Step 4"| T5
+
+    style AGENT fill:#1a2a3a,stroke:#60a5fa,stroke-width:2px
+    style TOOLS fill:#1a1a2a,stroke:#a78bfa
 ```
 
 ## API Contract (for frontend ↔ backend coordination)

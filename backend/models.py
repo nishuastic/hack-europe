@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from sqlmodel import Field, SQLModel, JSON, Column
+from sqlmodel import JSON, Column, Field, SQLModel
 
 
 class EnrichmentStatus(str, Enum):
@@ -32,7 +32,9 @@ class PitchSlide(SQLModel):
 
 class BuyingSignal(SQLModel):
     """A structured buying signal extracted from enrichment data."""
-    signal_type: str        # "recent_funding", "hiring_surge", "competitor_mentioned", "expansion", "pain_indicator", "tech_stack_match"
+    # recent_funding | hiring_surge | competitor_mentioned
+    # expansion | pain_indicator | tech_stack_match
+    signal_type: str
     description: str        # "Raised $45M Series B in Jan 2024"
     strength: str           # "strong", "moderate", "weak"
 

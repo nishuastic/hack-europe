@@ -45,6 +45,11 @@ An AI sales agent that takes a product catalog and target companies, enriches co
 - Environment variables in `.env` (never committed)
 - Person B's prompts live in `prompts/` — Person A imports them, never duplicates them
 - AG Grid theme: `ag-theme-alpine-dark`
+- **After every backend change, run all three:**
+  - `uv run ruff check backend/` (linter) + `uv run ruff check backend/ --fix` (auto-fix)
+  - `uv run mypy backend/` (type checker)
+  - `uv run pytest backend/tests/ -v` (unit tests)
+  - All must pass clean before committing. Config in `pyproject.toml`.
 
 ## Phases
 1. **Hours 0-8:** Core MVP — paste companies, see enriched spreadsheet fill live

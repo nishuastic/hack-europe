@@ -17,6 +17,19 @@ uv add fastapi "uvicorn[standard]" sqlmodel linkup-sdk anthropic websockets pyth
 uv run uvicorn backend.main:app --reload --port 8000
 ```
 
+## Lint & Type-Check Workflow
+Run after every code change:
+```bash
+uv run ruff check backend/              # Linter (fast, auto-fixable)
+uv run ruff check backend/ --fix        # Auto-fix what it can
+uv run mypy backend/ --ignore-missing-imports  # Type checker
+```
+Run tests:
+```bash
+uv run pytest backend/tests/ -v          # Unit tests (14 tests)
+```
+All three must pass clean before committing. Dev deps: `uv add --dev ruff mypy pytest pytest-asyncio httpx`
+
 ## Environment Variables (`.env`)
 ```
 ANTHROPIC_API_KEY=sk-ant-...
@@ -31,31 +44,31 @@ STRIPE_SECRET_KEY=sk_test_... # Phase 3
 
 ### Files to Create
 - [x] `backend/__init__.py`
-- [ ] `backend/main.py` — FastAPI app, CORS (allow localhost:3000), route registration
-- [ ] `backend/config.py` — `Settings` class reading from env
-- [ ] `backend/models.py` — SQLModel schemas (**see `models.py` already created**)
-- [ ] `backend/db.py` — SQLite engine + session dependency
-- [ ] `backend/enrichment/__init__.py`
-- [ ] `backend/enrichment/linkup_search.py` — wrapper around `LinkupClient`
-- [ ] `backend/enrichment/claude_enricher.py` — takes raw search results, returns structured Lead fields
-- [ ] `backend/enrichment/pipeline.py` — orchestrates: for each lead → LinkUp → Claude → save → WS push
+- [x] `backend/main.py` — FastAPI app, CORS, WebSocket manager, Product CRUD, Lead import + list, fire-and-forget enrichment
+- [x] `backend/config.py` — `Settings` class (pydantic-settings) reading from `.env`
+- [x] `backend/models.py` — SQLModel schemas (**see `models.py` already created**)
+- [x] `backend/db.py` — Async SQLite engine (aiosqlite) + session dependency + `init_db()`
+- [x] `backend/enrichment/__init__.py`
+- [x] `backend/enrichment/linkup_search.py` — 5 parallel LinkUp searches per company (lazy client init)
+- [x] `backend/enrichment/claude_enricher.py` — Claude structured extraction, JSON fence stripping
+- [x] `backend/enrichment/pipeline.py` — Orchestrates: search → Claude → save → per-field WS broadcast
 
-### API Endpoints to Implement
+### API Endpoints — DONE
 ```python
-# Product catalog CRUD
-POST /api/products          # Bulk import product catalog: {"products": [{name, description, ...}]}
+# Product catalog CRUD — all implemented ✅
+POST /api/products          # Bulk import: {"products": [{name, description, ...}]}
 GET  /api/products          # List all products
 GET  /api/products/{id}     # Single product detail
 PUT  /api/products/{id}     # Update a product
 DELETE /api/products/{id}   # Remove a product
 
-# Lead management
-POST /api/leads/import      # {"companies": ["Stripe", "Plaid"]} → create leads, kick off enrichment
-GET  /api/leads             # Return all leads with current enrichment data
+# Lead management — all implemented ✅
+POST /api/leads/import      # {"companies": ["Stripe", "Plaid"]} → creates leads + fires enrichment
+GET  /api/leads             # All leads with enrichment data
 GET  /api/leads/{id}        # Single lead detail
 
-# Real-time
-WS   /ws/updates            # Push cell updates as enrichment completes
+# Real-time — implemented ✅
+WS   /ws/updates            # Broadcasts enrichment_start, cell_update, enrichment_complete
 ```
 
 ### WebSocket Protocol
