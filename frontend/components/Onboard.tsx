@@ -100,7 +100,7 @@ export default function Onboard() {
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400"
-                placeholder="e.g. SalesForge"
+                placeholder="e.g. Stick"
               />
             </div>
             <div>

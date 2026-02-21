@@ -23,7 +23,7 @@ export default function Sidebar({ view, setView }: SidebarProps) {
           </span>
         </div>
         <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-900">
-          SalesForge
+          Stick
         </h2>
       </div>
 
@@ -44,8 +44,8 @@ export default function Sidebar({ view, setView }: SidebarProps) {
               <span
                 className={`material-symbols-outlined text-[20px] transition-colors ${
                   isActive
-                    ? "text-primary"
-                    : "text-slate-400 group-hover:text-primary"
+                    ? "text-gray-700"
+                    : "text-gray-400 group-hover:text-gray-700"
                 }`}
               >
                 {item.icon}
@@ -63,12 +63,14 @@ export default function Sidebar({ view, setView }: SidebarProps) {
             onClick={() => setView({ page: "onboard" })}
             className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors w-full text-left ${
               view.page === "onboard"
-                ? "bg-primary/5 text-primary"
+                ? "bg-slate-100 text-slate-900"
                 : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
             }`}
           >
             <span
-              className={`material-symbols-outlined text-[20px] ${view.page === "onboard" ? "" : "text-slate-400"}`}
+              className={`material-symbols-outlined text-[20px] ${
+                view.page === "onboard" ? "text-gray-700" : "text-gray-400"
+              }`}
             >
               settings
             </span>
@@ -89,7 +91,7 @@ export default function Sidebar({ view, setView }: SidebarProps) {
             </p>
             <p className="text-xs text-slate-500 truncate">admin@acme.io</p>
           </div>
-          <span className="material-symbols-outlined text-slate-400 text-[18px]">
+          <span className="material-symbols-outlined text-gray-700 text-[18px]">
             more_vert
           </span>
         </button>

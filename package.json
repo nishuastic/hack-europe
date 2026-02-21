@@ -1,0 +1,25 @@
+{
+  "name": "stick",
+  "version": "1.0.0",
+  "description": "An AI sales agent that takes your product catalog and target companies, enriches them with deep web research, matches the best product to each company, and generates personalized pitch decks — automatically.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nishuastic/hack-europe.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/nishuastic/hack-europe/issues"
+  },
+  "homepage": "https://github.com/nishuastic/hack-europe#readme",
+  "title": "Stick Dashboard"
+}

@@ -1,4 +1,4 @@
-"""SalesForge data models — SQLModel schemas for leads, enrichments, product matching, and pitch decks."""
+"""Stick data models — SQLModel schemas for leads, enrichments, product matching, and pitch decks."""
 
 from datetime import datetime
 from enum import Enum

@@ -1,18 +1,17 @@
-"""SalesForge API — FastAPI application with WebSocket streaming."""
+"""Stick API — FastAPI application with WebSocket streaming."""
 
 import asyncio
 import json
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+<<<<<<< HEAD
 from backend.auth import (
     create_access_token,
     create_refresh_token,
@@ -20,26 +19,17 @@ from backend.auth import (
     hash_password,
     verify_password,
 )
+=======
+>>>>>>> 8396847e04749784afcbaee03385dc7c4f63beb2
 from backend.db import get_session, init_db
-from backend.discovery.discovery_pipeline import run_discovery
 from backend.enrichment.pipeline import enrich_lead, enrich_leads
-from backend.models import (
-    CompanyProfile,
-    EnrichmentStatus,
-    GeneratedEmail,
-    Lead,
-    PitchDeck,
-    Product,
-    ProductMatch,
-    User,
-)
+from backend.models import EnrichmentStatus, Lead, Product
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 # ─── WebSocket Manager ───────────────────────────────────────────────
-
 
 class ConnectionManager:
     def __init__(self):
@@ -66,7 +56,6 @@ manager = ConnectionManager()
 
 # ─── App Lifespan ─────────────────────────────────────────────────────
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -74,7 +63,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SalesForge", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Stick API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -86,7 +75,6 @@ app.add_middleware(
 
 
 # ─── WebSocket Endpoint ──────────────────────────────────────────────
-
 
 @app.websocket("/ws/updates")
 async def websocket_endpoint(ws: WebSocket):
@@ -179,7 +167,6 @@ async def get_me(user: User = Depends(get_current_user)):
 
 # ─── Request/Response Schemas ─────────────────────────────────────────
 
-
 class ProductCreate(BaseModel):
     name: str
     description: str
@@ -214,25 +201,11 @@ class BulkProductImport(BaseModel):
     products: list[ProductCreate]
 
 
-class DiscoveryRequest(BaseModel):
-    product_ids: list[int] | None = None
-    max_companies: int = 20
-
-
-class CompanyProfileUpsert(BaseModel):
-    company_name: str
-    website: str | None = None
-    growth_stage: str | None = None
-    geography: str | None = None
-    value_proposition: str | None = None
-
-
 class LeadImport(BaseModel):
     companies: list[str]
 
 
 # ─── Product CRUD ─────────────────────────────────────────────────────
-
 
 @app.post("/api/products")
 async def import_products(
@@ -300,6 +273,7 @@ async def delete_product(
     return {"deleted": True}
 
 
+<<<<<<< HEAD
 # ─── Company Profile ──────────────────────────────────────────────────
 
 
@@ -340,8 +314,9 @@ async def run_discovery_endpoint(body: DiscoveryRequest):
     }
 
 
+=======
+>>>>>>> 8396847e04749784afcbaee03385dc7c4f63beb2
 # ─── Lead Import + List ───────────────────────────────────────────────
-
 
 @app.post("/api/leads/import")
 async def import_leads(
@@ -395,6 +370,7 @@ async def trigger_enrich(
     # Fire-and-forget
     asyncio.create_task(enrich_lead(lead_id, manager))
     return {"lead_id": lead_id, "status": "enrichment_started"}
+<<<<<<< HEAD
 
 
 # ─── Product Matching ─────────────────────────────────────────────────
@@ -594,3 +570,5 @@ async def trigger_predictions(session: AsyncSession = Depends(get_session)):
 
     asyncio.create_task(predict_conversions(manager, session))
     return {"status": "prediction_started"}
+=======
+>>>>>>> 8396847e04749784afcbaee03385dc7c4f63beb2
