@@ -17,6 +17,19 @@ uv add fastapi "uvicorn[standard]" sqlmodel linkup-sdk anthropic websockets pyth
 uv run uvicorn backend.main:app --reload --port 8000
 ```
 
+## Lint & Type-Check Workflow
+Run after every code change:
+```bash
+uv run ruff check backend/              # Linter (fast, auto-fixable)
+uv run ruff check backend/ --fix        # Auto-fix what it can
+uv run mypy backend/ --ignore-missing-imports  # Type checker
+```
+Run tests:
+```bash
+uv run pytest backend/tests/ -v          # Unit tests (50 tests)
+```
+All three must pass clean before committing. Dev deps: `uv add --dev ruff mypy pytest pytest-asyncio httpx`
+
 ## Environment Variables (`.env`)
 ```
 ANTHROPIC_API_KEY=sk-ant-...
@@ -31,31 +44,43 @@ STRIPE_SECRET_KEY=sk_test_... # Phase 3
 
 ### Files to Create
 - [x] `backend/__init__.py`
-- [ ] `backend/main.py` — FastAPI app, CORS (allow localhost:3000), route registration
-- [ ] `backend/config.py` — `Settings` class reading from env
-- [ ] `backend/models.py` — SQLModel schemas (**see `models.py` already created**)
-- [ ] `backend/db.py` — SQLite engine + session dependency
-- [ ] `backend/enrichment/__init__.py`
-- [ ] `backend/enrichment/linkup_search.py` — wrapper around `LinkupClient`
-- [ ] `backend/enrichment/claude_enricher.py` — takes raw search results, returns structured Lead fields
-- [ ] `backend/enrichment/pipeline.py` — orchestrates: for each lead → LinkUp → Claude → save → WS push
+- [x] `backend/main.py` — FastAPI app, CORS, WebSocket manager, Product CRUD, Lead import + list + single enrich endpoint
+- [x] `backend/config.py` — `Settings` class (pydantic-settings) reading from `.env`
+- [x] `backend/models.py` — SQLModel schemas (**see `models.py` already created**)
+- [x] `backend/db.py` — Async SQLite engine (aiosqlite) + session dependency + `init_db()`
+- [x] `backend/enrichment/__init__.py`
+- [x] `backend/enrichment/linkup_search.py` — LinkUp client singleton (lazy init)
+- [x] `backend/enrichment/pipeline.py` — Multi-agent orchestrator with iterative follow-up (max 2 rounds)
+- [x] `backend/enrichment/agents/__init__.py`
+- [x] `backend/enrichment/agents/query_planner.py` — Agent 1: Claude generates tailored search queries per company
+- [x] `backend/enrichment/agents/search_executor.py` — Agent 2: LinkUp parallel search (sourcedAnswer + structured modes)
+- [x] `backend/enrichment/agents/data_extractor.py` — Agent 3: Claude extracts structured Lead fields + gap analysis
+- [x] ~~`backend/enrichment/claude_enricher.py`~~ — **Deleted**: logic moved to `agents/data_extractor.py`
+- [x] `backend/discovery/__init__.py`
+- [x] `backend/discovery/prompts.py` — ICP discovery system prompt builder
+- [x] `backend/discovery/icp_agent.py` — Claude Sonnet tool_use agent (4 tools, iterative search)
+- [x] `backend/discovery/discovery_pipeline.py` — Orchestrator: products → agent → leads → auto-enrich
 
-### API Endpoints to Implement
+### API Endpoints — DONE
 ```python
-# Product catalog CRUD
-POST /api/products          # Bulk import product catalog: {"products": [{name, description, ...}]}
+# Product catalog CRUD — all implemented ✅
+POST /api/products          # Bulk import: {"products": [{name, description, ...}]}
 GET  /api/products          # List all products
 GET  /api/products/{id}     # Single product detail
 PUT  /api/products/{id}     # Update a product
 DELETE /api/products/{id}   # Remove a product
 
-# Lead management
-POST /api/leads/import      # {"companies": ["Stripe", "Plaid"]} → create leads, kick off enrichment
-GET  /api/leads             # Return all leads with current enrichment data
-GET  /api/leads/{id}        # Single lead detail
+# ICP Discovery — implemented ✅
+POST /api/discovery/run     # {product_ids?: int[], max_companies: int} → discovers leads matching ICPs
 
-# Real-time
-WS   /ws/updates            # Push cell updates as enrichment completes
+# Lead management — all implemented ✅
+POST /api/leads/import      # {"companies": ["Stripe", "Plaid"]} → creates leads + fires enrichment
+GET  /api/leads             # All leads with enrichment data
+GET  /api/leads/{id}        # Single lead detail
+POST /api/leads/{id}/enrich # Re-trigger enrichment for a single lead
+
+# Real-time — implemented ✅
+WS   /ws/updates            # Broadcasts discovery_*, enrichment_start, cell_update, enrichment_complete
 ```
 
 ### WebSocket Protocol

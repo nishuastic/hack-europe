@@ -367,8 +367,167 @@ Keep under 80 words (≈30 seconds spoken).
 
 ---
 
+## Multi-Agent Prompt Specs (NEW — for Person B)
+
+The backend now uses a **3-agent pipeline** instead of the old flat search → extract flow. Each agent has an inline fallback prompt, but Person B should create proper prompts that the agents import.
+
+### 1. `prompts/query_planner_prompt.py`
+
+**What the agent does:** Takes a company name and generates 5-8 tailored search queries (not hardcoded templates). On follow-up rounds, takes gap info and generates 2-4 targeted queries.
+
+**What to create:**
+```python
+def build_prompt() -> tuple[str, str]:
+    """Return (system_prompt, follow_up_addendum).
+
+    system_prompt: Main prompt for Claude to generate search queries.
+    follow_up_addendum: Appended when doing follow-up rounds.
+        Must contain {gaps}, {hints}, {existing_context} format placeholders.
+    """
+```
+
+**System prompt should instruct Claude to:**
+- Generate JSON: `{"queries": [{"query": "...", "depth": "standard|deep", "target_field": "...", "rationale": "..."}]}`
+- Target fields: description, funding, industry, revenue, employees, contacts, customers, buying_signals
+- Use "standard" for simple lookups, "deep" for contacts/customers/revenue
+- Make queries specific to the company (not generic templates)
+- For follow-up: only generate queries for missing fields
+
+**Imported by:** `backend/enrichment/agents/query_planner.py`
+
+### 2. `prompts/extraction_prompt.py`
+
+**What the agent does:** Takes search results and extracts structured Lead fields. Also returns confidence per field, list of gaps, and follow-up hints. On follow-up rounds, merges new data with existing.
+
+**What to create:**
+```python
+def build_prompt() -> tuple[str, str]:
+    """Return (system_prompt, merge_addendum).
+
+    system_prompt: Main prompt for Claude to extract structured data.
+    merge_addendum: Appended when merging with existing data.
+        Must contain {existing_data} format placeholder.
+    """
+```
+
+**System prompt should instruct Claude to return JSON:**
+```json
+{
+  "data": {
+    "description": "...", "funding": "...", "industry": "...",
+    "revenue": "...", "employees": 123,
+    "contacts": [{"name": "...", "role": "...", "linkedin": "..."}],
+    "customers": ["..."],
+    "buying_signals": [{"signal_type": "...", "description": "...", "strength": "..."}]
+  },
+  "field_confidences": [{"field": "...", "confidence": "high|medium|low", "reason": "..."}],
+  "gaps": ["field names that are missing"],
+  "follow_up_hints": ["specific search suggestions"]
+}
+```
+
+**Merge rules for follow-up:**
+- Keep existing values if new data doesn't contradict
+- Replace if new data is higher-confidence
+- Append to lists (deduplicate by name)
+
+**Imported by:** `backend/enrichment/agents/data_extractor.py`
+
+### 3. `prompts/discovery_prompt.py` (NEW — ICP Discovery)
+
+**What the agent does:** Takes the product catalog, derives Ideal Customer Profiles, then uses Claude Sonnet with 4 tools to iteratively search for matching companies via LinkUp.
+
+**What to create:**
+```python
+def build_prompt(products: list[Product]) -> str:
+    """Return the ICP discovery system prompt.
+
+    Takes the full product catalog and returns a system prompt that instructs
+    Claude to derive ICPs, search for companies, validate them, and submit results.
+    """
+```
+
+**Available tools (defined in backend/discovery/icp_agent.py):**
+- `search_companies(query, depth)` → LinkUp structured → company names + URLs
+- `fetch_company_website(url)` → LinkUp content fetch → page content
+- `get_company_details(company_name, company_url?)` → LinkUp structured → description, industry, funding, revenue, employees
+- `submit_discovered_companies(companies)` → terminal: ends the loop
+
+**Prompt should instruct Claude to:**
+- Analyze products and derive ICPs (industry, size, stage, geography, pain points)
+- Generate specific search queries per ICP
+- Validate promising companies by fetching their website
+- Try different ICP angles if not enough companies found
+- Include `why_good_fit` reasoning per company
+- Never hallucinate — only submit companies from actual search results
+
+**Test with:**
+```bash
+uv run python -m prompts.test_discovery              # Dry run: print prompt
+uv run python -m prompts.test_discovery --run --max 5 # Live run
+```
+
+**Imported by:** `backend/discovery/prompts.py` (falls back to built-in prompt if import fails)
+
+### 4. Contract Summary
+
+| File | Function | Returns | Imported By |
+|------|----------|---------|-------------|
+| `prompts/query_planner_prompt.py` | `build_prompt()` | `tuple[str, str]` (system, follow_up) | `agents/query_planner.py` |
+| `prompts/extraction_prompt.py` | `build_prompt()` | `tuple[str, str]` (system, merge) | `agents/data_extractor.py` |
+| `prompts/discovery_prompt.py` | `build_prompt(products)` | `str` (system prompt) | `discovery/prompts.py` |
+
+All agents fall back to inline placeholder prompts if the import fails — so the system works even before Person B delivers. But the inline prompts are basic; Person B's versions should be much more detailed and tested.
+
+### 4. Test Runner — Iterating on Prompts
+
+The test runner lets you run the full 3-agent pipeline (or individual stages) from the CLI without starting the server. Results are saved as JSON for comparison.
+
+**Quick start:**
+```bash
+# From project root (where .env lives):
+
+# Free: iterate on query planner prompt (Claude Haiku only, no LinkUp)
+uv run python -m prompts.test_runner "Stripe" --stage plan
+
+# Run plan + search (costs LinkUp credits, no extraction)
+uv run python -m prompts.test_runner "Stripe" --stage search
+
+# Full pipeline: plan + search + extract (shows completeness table)
+uv run python -m prompts.test_runner "Stripe"
+
+# Multiple companies
+uv run python -m prompts.test_runner "Stripe" "Plaid" "Datadog"
+
+# 5 default companies
+uv run python -m prompts.test_runner
+
+# All 20 test companies
+uv run python -m prompts.test_runner --all
+
+# Don't save results to prompts/results/
+uv run python -m prompts.test_runner "Stripe" --no-save
+```
+
+**Workflow for iterating on query planner prompt:**
+1. Edit `prompts/query_planner_prompt.py`
+2. Run `uv run python -m prompts.test_runner "Stripe" --stage plan`
+3. Check query quality — are they specific? Do they cover all fields?
+4. Repeat until satisfied, then run full pipeline
+
+**Workflow for iterating on extraction prompt:**
+1. Edit `prompts/extraction_prompt.py`
+2. Run `uv run python -m prompts.test_runner "Stripe"` (full pipeline)
+3. Check the extraction table — completeness %, confidence levels, gaps
+4. Compare JSON results in `prompts/results/` across prompt versions
+
+**Comparing prompt versions:**
+Results are saved to `prompts/results/<timestamp>_<company>.json`. To compare two versions, diff the JSON files or look at the `scores` section.
+
+---
+
 ## Phase 4 — Quality Pass (Hours 20-24)
-- [ ] Run all prompts against 5 demo companies × 3 demo products, fix any issues
+- [ ] Run all prompts against 5 demo companies x 3 demo products, fix any issues
 - [ ] Ensure product matches are well-calibrated for demo data
 - [ ] Ensure pitch decks are flawless for demo companies
 - [ ] Prepare 3 backup pitch decks (pre-generated) in case API is slow during demo
