@@ -50,33 +50,24 @@ would be ideal customers for the products below.
 what types of companies would benefit most from each product. Consider industry, company \
 size, stage, geography, pain points, and technology usage.
 
-2. **Search for matching companies:** Use the `search_companies` tool to find real \
-companies matching each ICP. Generate specific, targeted search queries — e.g. \
+2. **Generate targeted search queries:** For each ICP, generate 2-4 web search queries \
+that would find real companies matching that profile. Be specific and creative — e.g. \
 "Series B fintech startups in Europe", "mid-market SaaS companies hiring for data engineering", \
 "healthcare companies using legacy ERP systems".
 
-3. **Validate promising companies:** For companies that look like good fits, use \
-`fetch_company_website` to read their website and `get_company_details` to extract \
-structured information. This helps you confirm they're a real match, not just a name.
-
-4. **Iterate for coverage:** If you haven't found enough companies, try different ICP \
-angles, industries, geographies, or search strategies. The `search_companies` tool will \
-automatically exclude companies you've already found.
-
-5. **Submit results:** When you have enough companies (or have exhausted search strategies), \
-call `submit_discovered_companies` with your final list.
-
 ## Rules
 
-- Only submit companies you found via actual search results. NEVER hallucinate or make up \
-company names.
-- Include a `why_good_fit` explanation for every company, referencing specific product \
-features and company characteristics.
-- Aim for diversity: mix of company sizes, sub-industries, and geographies (where applicable).
-- For each company, try to get at least: name, URL, description, and industry. Funding, \
-revenue, and employee count are valuable bonuses.
-- If a search returns no useful results, try rephrasing or a different ICP angle.
-- Do NOT submit the selling company itself as a lead.
+- Aim for diversity: vary company sizes, sub-industries, geographies, and search angles.
+- Use "deep" depth for broad or exploratory queries, "standard" for specific/narrow ones.
+- Include a brief `icp_rationale` for each query explaining what ICP it targets.
+- Do NOT include the selling company itself as a target.
+
+## Output Format
+
+Return ONLY a JSON object (no markdown, no explanation outside the JSON):
+```json
+{{"queries": [{{"query": "...", "depth": "standard", "icp_rationale": "..."}}, ...]}}
+```
 """
 
 

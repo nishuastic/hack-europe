@@ -8,7 +8,7 @@ from typing import Any
 import anthropic
 
 from backend.config import settings
-from backend.discovery.prompts import build_evaluation_prompt
+from backend.discovery.prompts import build_discovery_prompt, build_evaluation_prompt
 from backend.enrichment.linkup_search import _get_client
 from backend.models import Product
 
@@ -50,20 +50,81 @@ _COMPANY_SEARCH_SCHEMA = json.dumps({
 # ─── Phase 1: Search ──────────────────────────────────────────────────────
 
 
-def _build_search_queries(product: Product) -> list[str]:
-    """Build 2-3 search queries from a product's ICP signals."""
-    queries: list[str] = []
+def _get_query_gen_prompt(products: list[Product]) -> str:
+    """Get the Phase 1 query-generation prompt, preferring the prompts/ override."""
+    try:
+        from prompts.discovery_prompt import build_prompt
+        return build_prompt(products)
+    except Exception:
+        return build_discovery_prompt(products)
+
+
+async def _plan_discovery_queries(products: list[Product]) -> list[dict[str, str]]:
+    """Call Claude to generate targeted search queries for the products."""
+    prompt = _get_query_gen_prompt(products)
+    try:
+        response = await _get_claude_client().messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = ""
+        if response.content:
+            first = response.content[0]
+            text = first.text if hasattr(first, "text") else ""
+
+        # Strip markdown fences if present
+        json_str = text
+        if "```" in json_str:
+            start = json_str.find("```")
+            end = json_str.rfind("```")
+            if start != end:
+                inner = json_str[start:end]
+                inner = inner.split("\n", 1)[1] if "\n" in inner else inner
+                json_str = inner
+        json_str = json_str.strip()
+
+        data = json.loads(json_str)
+        queries: list[dict[str, str]] = data.get("queries", [])
+        if not isinstance(queries, list) or not queries:
+            logger.warning("Claude returned no queries, falling back")
+            return []
+        logger.info(f"Claude generated {len(queries)} discovery queries")
+        return queries
+    except Exception as e:
+        logger.warning(f"Claude query generation failed: {e}")
+        return []
+
+
+def _build_search_queries_fallback(product: Product) -> list[dict[str, str]]:
+    """Fallback: build 2-3 search queries from a product's ICP signals."""
+    queries: list[dict[str, str]] = []
     base = product.name
     if product.industry_focus:
-        queries.append(f"{product.industry_focus} companies that need {base}")
+        queries.append({
+            "query": f"{product.industry_focus} companies that need {base}",
+            "depth": "standard",
+            "icp_rationale": f"Industry match: {product.industry_focus}",
+        })
     if product.company_size_target:
-        queries.append(f"{product.company_size_target} companies looking for {base}")
+        queries.append({
+            "query": f"{product.company_size_target} companies looking for {base}",
+            "depth": "standard",
+            "icp_rationale": f"Size match: {product.company_size_target}",
+        })
     if product.geography:
-        geo = product.geography
-        queries.append(f"{base} potential customers in {geo}")
+        queries.append({
+            "query": f"{base} potential customers in {product.geography}",
+            "depth": "standard",
+            "icp_rationale": f"Geography match: {product.geography}",
+        })
     # Always add a generic query
     desc_snippet = (product.description or "")[:80]
-    queries.append(f"companies that would buy {base} {desc_snippet}")
+    queries.append({
+        "query": f"companies that would buy {base} {desc_snippet}",
+        "depth": "deep",
+        "icp_rationale": "General ICP search",
+    })
     return queries[:3]
 
 
@@ -106,11 +167,18 @@ async def _search_all_products(
     seen_urls: set[str] = set()
     all_candidates: list[dict[str, Any]] = []
 
-    # Build all search tasks
-    tasks: list[tuple[str, str]] = []  # (query, product_name)
-    for product in products:
-        for query in _build_search_queries(product):
-            tasks.append((query, product.name))
+    # Try Claude-planned queries first, fall back to templates
+    planned = await _plan_discovery_queries(products)
+    tasks: list[tuple[str, str]] = []  # (query, depth)
+    if planned:
+        for q in planned:
+            tasks.append((q.get("query", ""), q.get("depth", "standard")))
+        tasks = [(q, d) for q, d in tasks if q]
+    if not tasks:
+        logger.info("Using fallback query builder")
+        for product in products:
+            for q in _build_search_queries_fallback(product):
+                tasks.append((q["query"], q.get("depth", "standard")))
 
     if ws_manager:
         await ws_manager.broadcast({
@@ -121,8 +189,8 @@ async def _search_all_products(
 
     # Run all searches in parallel
     search_coros = [
-        _exec_search_companies(query, "deep", seen_urls)
-        for query, _ in tasks
+        _exec_search_companies(query, depth, seen_urls)
+        for query, depth in tasks
     ]
     results = await asyncio.gather(*search_coros, return_exceptions=True)
 
