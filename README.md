@@ -115,7 +115,7 @@ curl -X POST http://localhost:8000/api/leads/1/enrich
 uv run ruff check backend/                # Lint
 uv run ruff check backend/ --fix          # Auto-fix
 uv run mypy backend/                      # Type check
-uv run pytest backend/tests/ -v           # Unit tests (38 tests)
+uv run pytest backend/tests/ -v           # Unit tests (69 tests)
 ```
 
 All three must pass before committing.
