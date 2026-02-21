@@ -25,14 +25,9 @@ async def run_discovery(
     Runs as a background task (fire-and-forget from the API endpoint).
     """
     async with async_session() as session:
-        # Load products
-        if product_ids:
-            result = await session.execute(
-                select(Product).where(Product.id.in_(product_ids), Product.user_id == user_id)  # type: ignore[union-attr]
-            )
-        else:
-            result = await session.execute(select(Product).where(Product.user_id == user_id))
-        products = list(result.scalars().all())
+        # Always load all user products for full catalog context
+        all_result = await session.execute(select(Product).where(Product.user_id == user_id))
+        products = list(all_result.scalars().all())
 
         if not products:
             logger.error("No products found for discovery")
@@ -42,21 +37,38 @@ async def run_discovery(
             })
             return
 
+        # Derive selected_products from product_ids filter
+        selected_products: list[Product] | None = None
+        if product_ids:
+            pid_set = set(product_ids)
+            selected_products = [p for p in products if p.id in pid_set]
+            if not selected_products:
+                logger.error("No matching products found for given product_ids")
+                await ws_manager.broadcast({
+                    "type": "discovery_error",
+                    "error": "No matching products found for the selected IDs.",
+                })
+                return
+
         # Load seller company profile (optional)
         cp_result = await session.execute(select(CompanyProfile))
         company_profile = cp_result.scalar_one_or_none()
 
     # Broadcast start
+    active_count = len(selected_products) if selected_products else len(products)
     await ws_manager.broadcast({
         "type": "discovery_start",
-        "product_count": len(products),
+        "product_count": active_count,
         "max_companies": max_companies,
     })
 
     try:
         # Run the ICP discovery agent
         discovered = await run_discovery_agent(
-            products, max_companies, ws_manager, company_profile=company_profile,
+            products, max_companies,
+            selected_products=selected_products,
+            ws_manager=ws_manager,
+            company_profile=company_profile,
         )
 
         if not discovered:
