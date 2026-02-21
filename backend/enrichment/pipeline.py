@@ -1,4 +1,4 @@
-"""Enrichment pipeline — multi-agent orchestrator with iterative follow-up."""
+"""Enrichment pipeline — 2-round orchestrator with single LinkUp call per round."""
 
 import asyncio
 import logging
@@ -7,8 +7,7 @@ from sqlmodel import select
 
 from backend.db import async_session
 from backend.enrichment.agents.data_extractor import ExtractionResult, extract_lead_data
-from backend.enrichment.agents.query_planner import plan_queries
-from backend.enrichment.agents.search_executor import execute_searches
+from backend.enrichment.agents.search_executor import execute_single_enrichment_search
 from backend.models import EnrichmentStatus, Lead
 
 logger = logging.getLogger(__name__)
@@ -35,7 +34,7 @@ def _should_follow_up(extraction: ExtractionResult, round_num: int) -> bool:
 
 
 async def enrich_lead(lead_id: int, ws_manager) -> None:  # noqa: C901
-    """Enrich a single lead using the 3-agent pipeline with iterative follow-up."""
+    """Enrich a single lead: 1 LinkUp call per round → Claude validates → optional round 2."""
     async with async_session() as session:
         lead = (await session.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
         if not lead:
@@ -56,63 +55,40 @@ async def enrich_lead(lead_id: int, ws_manager) -> None:  # noqa: C901
         try:
             existing_data: dict | None = None
             current_gaps: list[str] = []
-            current_hints: list[str] = []
             round_num = 0
 
             while round_num < MAX_ROUNDS:
                 round_num += 1
                 logger.info(f"Lead {lead_id} ({lead.company_name}): starting round {round_num}")
 
-                # ── Agent 1: Query Planner ──
-                await ws_manager.broadcast({
-                    "type": "agent_thinking",
-                    "lead_id": lead_id,
-                    "round": round_num,
-                    "action": "planning_queries",
-                    "detail": f"Round {round_num}: Planning search queries",
-                    "queries": [],
-                })
-
-                search_plan = await plan_queries(
-                    company_name=lead.company_name,
-                    company_url=lead.company_url,
-                    existing_context=existing_data,
-                    gaps=current_gaps if round_num > 1 else None,
-                    follow_up_hints=current_hints if round_num > 1 else None,
-                )
-
-                await ws_manager.broadcast({
-                    "type": "agent_thinking",
-                    "lead_id": lead_id,
-                    "round": round_num,
-                    "action": "planning_queries",
-                    "detail": f"Round {round_num}: Planning {len(search_plan)} searches",
-                    "queries": search_plan.query_texts,
-                })
-
-                # ── Agent 2: Search Executor ──
+                # ── Single LinkUp structured call ──
                 await ws_manager.broadcast({
                     "type": "agent_thinking",
                     "lead_id": lead_id,
                     "round": round_num,
                     "action": "executing_searches",
-                    "detail": f"Running {len(search_plan)} LinkUp searches in parallel",
+                    "detail": f"Round {round_num}: Searching LinkUp for all enrichment data (1 call)",
                 })
 
-                search_results = await execute_searches(search_plan)
+                search_result = await execute_single_enrichment_search(
+                    company_name=lead.company_name,
+                    company_url=lead.company_url,
+                    gaps=current_gaps if round_num > 1 else None,
+                    existing_context=existing_data if round_num > 1 else None,
+                )
 
-                # ── Agent 3: Data Extractor ──
+                # ── Claude validates + extracts structured data ──
                 await ws_manager.broadcast({
                     "type": "agent_thinking",
                     "lead_id": lead_id,
                     "round": round_num,
                     "action": "extracting_data",
-                    "detail": f"Analyzing {len(search_results)} search results with Claude",
+                    "detail": f"Round {round_num}: Claude validating and structuring data",
                 })
 
                 extraction = await extract_lead_data(
                     company_name=lead.company_name,
-                    search_results=search_results,
+                    search_results=[search_result],
                     existing_data=existing_data,
                 )
 
@@ -135,7 +111,6 @@ async def enrich_lead(lead_id: int, ws_manager) -> None:  # noqa: C901
                 # Update state for potential follow-up
                 existing_data = extraction.data
                 current_gaps = extraction.gaps
-                current_hints = extraction.follow_up_hints
 
                 # ── Follow-up decision ──
                 if _should_follow_up(extraction, round_num):
