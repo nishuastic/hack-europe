@@ -546,12 +546,6 @@ class ApiClient {
     return res.json();
   }
 
-  async generateVoice(leadId: number): Promise<void> {
-    await this.fetchWithAuth(`${API_BASE}/api/leads/${leadId}/voice`, {
-      method: "POST",
-    });
-  }
-
   async getAnalytics(): Promise<unknown> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/analytics`);
     return res.json();

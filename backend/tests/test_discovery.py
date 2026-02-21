@@ -295,7 +295,7 @@ async def test_plan_discovery_queries_success(mock_get_client):
     mock_block = MagicMock()
     mock_block.text = (
         '{"queries": [{"query": "fintech startups Europe",'
-        ' "depth": "deep", "icp_rationale": "Industry match"}]}'
+        ' "depth": "standard", "icp_rationale": "Industry match"}]}'
     )
     mock_response.content = [mock_block]
 
@@ -307,7 +307,7 @@ async def test_plan_discovery_queries_success(mock_get_client):
     result = await _plan_discovery_queries(products)
     assert len(result) == 1
     assert result[0]["query"] == "fintech startups Europe"
-    assert result[0]["depth"] == "deep"
+    assert result[0]["depth"] == "standard"
 
 
 @pytest.mark.asyncio

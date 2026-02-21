@@ -29,7 +29,6 @@ class UsageEventType(str, Enum):
     MATCHING = "matching"
     PITCH_DECK = "pitch_deck"
     EMAIL = "email"
-    VOICE = "voice"
 
 
 class UserCredits(SQLModel, table=True):
@@ -145,7 +144,6 @@ class Lead(SQLModel, table=True):
     # Action flags
     pitch_deck_generated: bool = False
     email_generated: bool = False
-    voice_generated: bool = False
 
 
 class Product(SQLModel, table=True):
@@ -204,15 +202,6 @@ class GeneratedEmail(SQLModel, table=True):
     subject: str
     body: str
 
-
-class VoiceBriefing(SQLModel, table=True):
-    """An ElevenLabs voice briefing for call prep."""
-
-    id: Optional[int] = Field(default=None, primary_key=True)
-    lead_id: int = Field(foreign_key="lead.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    script: str  # The text that was spoken
-    audio_path: str  # Path to audio file
 
 
 class PitchHistory(SQLModel, table=True):

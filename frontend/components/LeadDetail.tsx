@@ -72,12 +72,82 @@ function statusText(s: string) {
 
 export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDetailProps) {
   const [lead, setLead] = useState<Lead | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [generatingDeck, setGeneratingDeck] = useState(false);
+  const [generatingEmail, setGeneratingEmail] = useState(false);
+  const [emailContent, setEmailContent] = useState<{
+    subject: string;
+    body: string;
+  } | null>(null);
 
   useEffect(() => {
     api.getLead(leadId)
       .then(setLead)
       .catch(() => setLead({ ...DEMO_LEAD, id: leadId }));
   }, [leadId]);
+
+  const handleReEnrich = async () => {
+    setEnriching(true);
+    try {
+      await api.triggerEnrichment(leadId);
+      // Poll for updated lead
+      const interval = setInterval(async () => {
+        try {
+          const updated = await api.getLead(leadId);
+          setLead(updated);
+          if (
+            updated.enrichment_status === "complete" ||
+            updated.enrichment_status === "failed"
+          ) {
+            clearInterval(interval);
+            setEnriching(false);
+          }
+        } catch {
+          /* keep polling */
+        }
+      }, 2000);
+      setTimeout(() => {
+        clearInterval(interval);
+        setEnriching(false);
+      }, 120000);
+    } catch (err) {
+      console.error("Re-enrich failed:", err);
+      setEnriching(false);
+    }
+  };
+
+  const handleGenerateDeck = async () => {
+    if (!lead?.best_match_product) return;
+    setGeneratingDeck(true);
+    try {
+      // Use product_id 1 as default — in a full impl we'd look up the matched product
+      const matches = await api.getMatches(leadId);
+      const productId = matches.length > 0 ? matches[0].product_id : 1;
+      await api.generatePitchDeck(leadId, productId);
+      const updated = await api.getLead(leadId);
+      setLead(updated);
+    } catch (err) {
+      console.error("Pitch deck generation failed:", err);
+    } finally {
+      setGeneratingDeck(false);
+    }
+  };
+
+  const handleGenerateEmail = async () => {
+    setGeneratingEmail(true);
+    try {
+      const matches = await api.getMatches(leadId);
+      const productId = matches.length > 0 ? matches[0].product_id : 1;
+      const result = await api.generateEmail(leadId, productId);
+      setEmailContent(result);
+      const updated = await api.getLead(leadId);
+      setLead(updated);
+    } catch (err) {
+      console.error("Email generation failed:", err);
+    } finally {
+      setGeneratingEmail(false);
+    }
+  };
 
   if (!lead) {
     return (
@@ -219,56 +289,53 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
             </section>
           )}
 
-          {/* Key Contacts */}
-          {lead.contacts && lead.contacts.length > 0 && (
-            <section>
-              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-base">groups</span> Key Contacts
-                </span>
-                <span className="text-[10px] normal-case font-normal">{lead.contacts.length} Identified</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {lead.contacts.map((c, i) => (
-                  <div key={i} className="group flex items-center justify-between p-3 bg-white border border-slate-200 rounded hover:border-slate-400 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="size-8 bg-slate-100 rounded-full flex items-center justify-center text-slate-400">
-                        <span className="material-symbols-outlined text-[18px]">person</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold">{c.name}</p>
-                        <p className="text-[11px] text-slate-500">{c.role}</p>
-                        {c.email && <p className="text-[11px] text-slate-400">{c.email}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {c.email && (
-                        <a href={`mailto:${c.email}`} className="p-1.5 text-slate-400 hover:text-slate-700" title={c.email}>
-                          <span className="material-symbols-outlined text-[18px]">alternate_email</span>
-                        </a>
-                      )}
-                      {c.linkedin && (
-                        <a href={c.linkedin} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-blue-600">
-                          <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                ))}
+          {/* Email */}
+          <div className="space-y-4 pb-8">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <span className="material-symbols-outlined text-base">
+                  mail
+                </span>{" "}
+                Generated Email
+              </label>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleGenerateEmail}
+                  disabled={generatingEmail}
+                  className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors disabled:opacity-50"
+                >
+                  {generatingEmail && (
+                    <span className="material-symbols-outlined text-[14px] animate-spin">
+                      progress_activity
+                    </span>
+                  )}
+                  {generatingEmail ? "GENERATING..." : "GENERATE"}
+                </button>
+                <button
+                  onClick={() => {
+                    const text = emailContent
+                      ? `Subject: ${emailContent.subject}\n\n${emailContent.body}`
+                      : "";
+                    navigator.clipboard.writeText(text);
+                  }}
+                  className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 hover:text-slate-600 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    content_copy
+                  </span>{" "}
+                  COPY
+                </button>
               </div>
-            </section>
-          )}
-
-          {/* Known Customers */}
-          {lead.customers && lead.customers.length > 0 && (
-            <section>
-              <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="material-symbols-outlined text-base">storefront</span> Known Customers
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {lead.customers.map((customer, i) => (
-                  <span key={i} className="px-3 py-1.5 bg-white border border-slate-200 rounded text-sm text-slate-700 font-medium">
-                    {customer}
+            </div>
+            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col min-h-[300px]">
+              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+                <div className="flex gap-2 mb-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase w-12">
+                    Subject:
+                  </span>
+                  <span className="text-xs font-medium">
+                    {emailContent?.subject ||
+                      `Accelerating ${lead.company_name}'s Q4 Growth`}
                   </span>
                 ))}
               </div>
