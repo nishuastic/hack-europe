@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, GenerationRun, Product, ProductSnapshot, WSMessage, MOCK_GENERATION_RUNS } from "@/lib/api";
+import { api, GenerationRun, Product, ProductSnapshot, WSMessage } from "@/lib/api";
 
 interface DashboardProps {
   onSelectRun: (id: number) => void;
@@ -48,8 +48,8 @@ export default function Dashboard({ onSelectRun }: DashboardProps) {
   const fetchRuns = () => {
     api
       .getGenerationRuns()
-      .then((data) => setRuns(data.length > 0 ? data : MOCK_GENERATION_RUNS))
-      .catch(() => setRuns(MOCK_GENERATION_RUNS))
+      .then((data) => setRuns(data))
+      .catch((err) => console.error("Failed to fetch runs:", err))
       .finally(() => setLoading(false));
   };
 

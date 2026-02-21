@@ -7,24 +7,6 @@ interface ProductsProps {
   onEdit: (productId?: number) => void;
 }
 
-const DEMO_PRODUCTS: Product[] = [
-  {
-    id: 1,
-    name: "ChurnPredict",
-    description:
-      "AI-powered analytics dashboard that predicts which customers are likely to cancel.",
-    features: ["Real-time usage tracking", "Automated email triggers"],
-    differentiator: "94% accuracy in predicting churn",
-  },
-  {
-    id: 2,
-    name: "RetainFlow",
-    description: "Enterprise retention workflow automation platform.",
-    features: ["Custom workflows", "CRM integration"],
-    differentiator: "End-to-end retention pipeline",
-  },
-];
-
 export default function Products({ onEdit }: ProductsProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,7 +15,7 @@ export default function Products({ onEdit }: ProductsProps) {
     api
       .getProducts()
       .then(setProducts)
-      .catch(() => setProducts(DEMO_PRODUCTS))
+      .catch((err) => console.error("Failed to load products:", err))
       .finally(() => setLoading(false));
   }, []);
 

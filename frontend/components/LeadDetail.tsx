@@ -9,31 +9,6 @@ interface LeadDetailProps {
   onOpenPitchEditor: () => void;
 }
 
-const DEMO_LEAD: Lead = {
-  id: 1,
-  company_name: 'Acme Global Tech',
-  company_url: 'acmeglobal.com',
-  description: 'Leading provider of scalable cloud architecture for Fortune 500 companies. Recently expanded into Southeast Asia markets.',
-  funding: '$142M (Series C)',
-  industry: 'Cloud Infrastructure',
-  revenue: '$50M - $100M',
-  employees: 850,
-  contacts: [
-    { name: 'Sarah Jenkins', role: 'VP of Growth', email: 'sarah.jenkins@acmeglobal.com' },
-    { name: 'David Chen', role: 'Director of IT', email: 'david.chen@acmeglobal.com' },
-  ],
-  customers: ['Stripe', 'Datadog', 'MongoDB'],
-  buying_signals: [
-    { signal_type: 'recent_funding', description: 'Recent Funding Round', strength: 'strong' },
-    { signal_type: 'hiring_surge', description: 'New CMO Hired', strength: 'moderate' },
-    { signal_type: 'expansion', description: 'Expanded to Southeast Asia', strength: 'weak' },
-  ],
-  enrichment_status: 'complete',
-  pitch_deck_generated: true,
-  email_generated: true,
-  voice_generated: true,
-};
-
 function signalBadge(strength: string) {
   if (strength === 'strong') return 'bg-green-50 text-green-600 border border-green-200';
   if (strength === 'moderate') return 'bg-amber-50 text-amber-600 border border-amber-200';
@@ -83,7 +58,9 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
   useEffect(() => {
     api.getLead(leadId)
       .then(setLead)
-      .catch(() => setLead({ ...DEMO_LEAD, id: leadId }));
+      .catch((err) => {
+        console.error("Failed to load lead:", err);
+      });
   }, [leadId]);
 
   const handleReEnrich = async () => {
@@ -337,11 +314,37 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
                     {emailContent?.subject ||
                       `Accelerating ${lead.company_name}'s Q4 Growth`}
                   </span>
-                ))}
+                </div>
               </div>
-            </section>
-          )}
-
+              <div className="flex-1 p-6 text-sm text-slate-700 leading-relaxed font-light space-y-4">
+                {emailContent ? (
+                  emailContent.body
+                    .split("\n\n")
+                    .map((para, i) => <p key={i}>{para}</p>)
+                ) : (
+                  <>
+                    <p>
+                      Hi {lead.contacts?.[0]?.name?.split(" ")[0] || "there"},
+                    </p>
+                    <p>
+                      I noticed {lead.company_name}&apos;s recent{" "}
+                      {lead.funding ? "funding round" : "growth"} and the focus
+                      on scaling your{" "}
+                      {lead.industry?.toLowerCase() || "operations"}.
+                    </p>
+                    <p>
+                      Would you be open to a 15-minute chat next Tuesday?
+                    </p>
+                    <p>
+                      Best,
+                      <br />
+                      Alex
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
