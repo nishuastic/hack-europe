@@ -248,6 +248,22 @@ class ApiClient {
     return res.json();
   }
 
+  async runDiscovery(
+    productIds?: number[],
+    maxCompanies: number = 20,
+  ): Promise<{ status: string; max_companies: number }> {
+    const res = await fetch(`${API_BASE}/api/discovery/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_ids: productIds,
+        max_companies: maxCompanies,
+      }),
+    });
+    if (!res.ok) throw new Error("Failed to start discovery");
+    return res.json();
+  }
+
   async getCompanyProfile(): Promise<{
     company_name?: string;
     website?: string;
