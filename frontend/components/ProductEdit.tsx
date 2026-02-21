@@ -59,7 +59,7 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
       <div className="clay-card rounded-2xl overflow-hidden">
         <div className="bg-slate-50 px-6 py-4 border-b border-slate-100 flex items-center gap-3">
           <div className="size-6 rounded bg-purple-100 text-purple-600 flex items-center justify-center">
-            <span className="material-symbols-outlined text-[16px]">inventory_2</span>
+            <span className="material-symbols-outlined text-[16px] text-black">inventory_2</span>
           </div>
           <h2 className="font-bold text-slate-800">Product Details</h2>
           {!isNew && (

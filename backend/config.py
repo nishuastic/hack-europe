@@ -1,4 +1,4 @@
-"""SalesForge settings — loaded from .env via pydantic-settings."""
+"""Stick settings — loaded from .env via pydantic-settings."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

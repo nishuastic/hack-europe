@@ -1,4 +1,4 @@
-# SalesForge — CLAUDE.md
+# Stick — CLAUDE.md
 
 ## What is this project?
 An AI sales agent that takes a product catalog and target companies, enriches companies with deep web research, uses AI to match the best product(s) to each company, and generates personalized pitch decks per match. Built for HackEurope hackathon (24h).
@@ -77,4 +77,4 @@ An AI sales agent that takes a product catalog and target companies, enriches co
 1:30 — Download PPTX + show drafted email
 1:40 — Play voice briefing
 1:50 — Show Stripe credits
-2:00 — "SalesForge: your AI sales team. Multiple products, perfect matches, personalized pitches."
+2:00 — "Stick: your AI sales team. Multiple products, perfect matches, personalized pitches."

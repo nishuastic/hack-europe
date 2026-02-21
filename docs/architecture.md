@@ -1,4 +1,4 @@
-# SalesForge — Architecture Overview
+# Stick — Architecture Overview
 
 ## What We're Building
 An AI sales agent that takes a catalog of products and a list of target companies, enriches the companies with deep web research, uses AI to match the best product(s) to each company, and generates personalized pitch decks + outreach emails per match. **Cheaper, specialized Claygent.**
@@ -366,7 +366,7 @@ Match update:
 ```json
 {"type": "match_update", "lead_id": 1, "product_id": 2,
  "match_score": 8.5, "match_reasoning": "Strong alignment because...",
- "product_name": "SalesForge Pro"}
+ "product_name": "Stick Pro"}
 ```
 
 ### Lead Schema (what the frontend renders)

@@ -134,7 +134,7 @@ POST /api/analytics/predict       # Run Claude conversion prediction across all 
   "total_leads": 25,
   "enriched": 23,
   "industry_breakdown": {"FinTech": 8, "SaaS": 6},
-  "avg_match_score_by_product": {"SalesForge Pro": 7.2},
+  "avg_match_score_by_product": {"Stick Pro": 7.2},
   "top_opportunities": [{"lead": "Stripe", "product": "Pro", "score": 9.5}],
   "signal_frequency": {"recent_funding": 12, "hiring_surge": 8},
   "score_distribution": {"1-3": 4, "4-6": 9, "7-10": 12}

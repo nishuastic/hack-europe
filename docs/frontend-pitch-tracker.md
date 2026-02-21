@@ -153,10 +153,10 @@ User clicks row in grid
 ┌─────────────────────────────────────────────┐
 │  ◀  Slide 3 of 7  ▶          [Fullscreen]  │
 │─────────────────────────────────────────────│
-│  Pitching: SalesForge Pro → Stripe          │
+│  Pitching: Stick Pro → Stripe          │
 │─────────────────────────────────────────────│
 │                                             │
-│     Why Stripe Needs SalesForge Pro         │
+│     Why Stripe Needs Stick Pro         │
 │                                             │
 │     • Payment processing at scale           │
 │       creates complex sales cycles          │
@@ -243,11 +243,11 @@ if (msg.type === 'prediction_update') {
 │ 🔍 Looking up key contacts...              │
 │ ✅ Found CEO, CTO, VP Sales                │
 │ 🔍 Matching products to Stripe...          │
-│ ✅ Best match: SalesForge Pro (9/10)       │
+│ ✅ Best match: Stick Pro (9/10)       │
 │    "Strong alignment: B2B sales at scale"  │
 │ 🔄 New info: Stripe just acquired X        │
 │    → Re-evaluating product match...        │
-│ ✅ Updated: still SalesForge Pro, adjusted │
+│ ✅ Updated: still Stick Pro, adjusted │
 │    pitch angle to reference M&A            │
 │ 📊 Generating pitch deck...               │
 │ ✅ 7 slides ready                          │
@@ -287,7 +287,7 @@ This is key for "Adaptable Agent" prize — visibly shows the agent changing its
 1:30 — Download PPTX + show drafted email
 1:40 — Play voice briefing
 1:50 — Show Stripe credits
-2:00 — "SalesForge: your AI sales team. Multiple products, perfect matches, personalized pitches."
+2:00 — "Stick: your AI sales team. Multiple products, perfect matches, personalized pitches."
 ```
 
 ---

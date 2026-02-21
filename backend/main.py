@@ -1,4 +1,4 @@
-"""SalesForge API — FastAPI application with WebSocket streaming."""
+"""Stick API — FastAPI application with WebSocket streaming."""
 
 import asyncio
 import json
@@ -53,7 +53,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="SalesForge", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Stick API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
