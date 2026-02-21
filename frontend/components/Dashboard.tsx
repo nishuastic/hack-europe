@@ -326,11 +326,19 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
                   >
                     <td className="px-6 py-3.5">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-8 w-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
-                          <span className="material-symbols-outlined text-[18px]">
-                            {ROW_ICONS[idx % ROW_ICONS.length]}
-                          </span>
-                        </div>
+                        {lead.company_url ? (
+                          <img
+                            src={`https://www.google.com/s2/favicons?domain=${lead.company_url}&sz=64`}
+                            alt=""
+                            className="flex-shrink-0 h-8 w-8 rounded bg-slate-100 border border-slate-200"
+                          />
+                        ) : (
+                          <div className="flex-shrink-0 h-8 w-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
+                            <span className="material-symbols-outlined text-[18px]">
+                              {ROW_ICONS[idx % ROW_ICONS.length]}
+                            </span>
+                          </div>
+                        )}
                         <div className="ml-3">
                           <div className="text-sm font-medium text-slate-900">
                             {lead.company_name}
