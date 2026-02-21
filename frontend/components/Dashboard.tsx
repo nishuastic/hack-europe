@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, Lead } from "@/lib/api";
+import { api, Lead, WSMessage } from "@/lib/api";
 
 interface DashboardProps {
   onSelectLead: (id: number) => void;
@@ -114,14 +114,93 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
+  const fetchLeads = () => {
     api
       .getLeads()
       .then(setLeads)
       .catch(() => setLeads(DEMO_LEADS))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchLeads();
+
+    // Connect WebSocket for live updates
+    api.connectWebSocket();
+    const unsubscribe = api.onMessage((msg: WSMessage) => {
+      if (msg.type === "cell_update") {
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === msg.lead_id ? { ...l, [msg.field]: msg.value } : l,
+          ),
+        );
+      } else if (msg.type === "enrichment_complete") {
+        // Re-fetch to get the full updated lead
+        api
+          .getLead(msg.lead_id)
+          .then((updated) => {
+            setLeads((prev) =>
+              prev.map((l) => (l.id === updated.id ? updated : l)),
+            );
+          })
+          .catch(() => {});
+      } else if (msg.type === "enrichment_start") {
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === msg.lead_id
+              ? { ...l, enrichment_status: "in_progress" }
+              : l,
+          ),
+        );
+      } else if (msg.type === "enrichment_error") {
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === msg.lead_id ? { ...l, enrichment_status: "failed" } : l,
+          ),
+        );
+      } else if (msg.type === "match_update") {
+        setLeads((prev) =>
+          prev.map((l) =>
+            l.id === msg.lead_id
+              ? {
+                  ...l,
+                  best_match_score: msg.match_score,
+                  best_match_product: msg.product_name,
+                }
+              : l,
+          ),
+        );
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      await api.runDiscovery();
+      // After discovery starts, periodically refresh leads as they come in
+      const interval = setInterval(() => {
+        api
+          .getLeads()
+          .then((newLeads) => {
+            if (newLeads.length > 0) setLeads(newLeads);
+          })
+          .catch(() => {});
+      }, 3000);
+      // Stop polling after 2 minutes
+      setTimeout(() => clearInterval(interval), 120000);
+    } catch (err) {
+      console.error("Discovery failed:", err);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const filtered = leads.filter((l) =>
     l.company_name.toLowerCase().includes(search.toLowerCase()),
@@ -146,9 +225,17 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
             </span>
             Filter
           </button>
-          <button className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Import
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <span
+              className={`material-symbols-outlined text-[18px] ${generating ? "animate-spin" : ""}`}
+            >
+              {generating ? "progress_activity" : "bolt"}
+            </span>
+            {generating ? "Generating..." : "Generate"}
           </button>
         </div>
       </div>
@@ -227,7 +314,7 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
                     colSpan={8}
                     className="px-6 py-8 text-center text-slate-500"
                   >
-                    No leads yet. Import companies to get started.
+                    No leads yet. Press generate to get started.
                   </td>
                 </tr>
               ) : (
@@ -239,11 +326,19 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
                   >
                     <td className="px-6 py-3.5">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-8 w-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
-                          <span className="material-symbols-outlined text-[18px]">
-                            {ROW_ICONS[idx % ROW_ICONS.length]}
-                          </span>
-                        </div>
+                        {lead.company_url ? (
+                          <img
+                            src={`https://www.google.com/s2/favicons?domain=${lead.company_url}&sz=64`}
+                            alt=""
+                            className="flex-shrink-0 h-8 w-8 rounded bg-slate-100 border border-slate-200"
+                          />
+                        ) : (
+                          <div className="flex-shrink-0 h-8 w-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
+                            <span className="material-symbols-outlined text-[18px]">
+                              {ROW_ICONS[idx % ROW_ICONS.length]}
+                            </span>
+                          </div>
+                        )}
                         <div className="ml-3">
                           <div className="text-sm font-medium text-slate-900">
                             {lead.company_name}

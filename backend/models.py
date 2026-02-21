@@ -7,6 +7,15 @@ from typing import Optional
 from sqlmodel import JSON, Column, Field, SQLModel
 
 
+class User(SQLModel, table=True):
+    """A registered user."""
+    id: int | None = Field(default=None, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    hashed_password: str
+    name: str = ""
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class EnrichmentStatus(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -16,6 +25,7 @@ class EnrichmentStatus(str, Enum):
 
 class Contact(SQLModel):
     """A key contact at a target company."""
+
     name: str
     role: str
     linkedin: Optional[str] = None
@@ -24,6 +34,7 @@ class Contact(SQLModel):
 
 class PitchSlide(SQLModel):
     """A single slide in a pitch deck."""
+
     slide_number: int
     title: str
     body_html: str
@@ -32,15 +43,29 @@ class PitchSlide(SQLModel):
 
 class BuyingSignal(SQLModel):
     """A structured buying signal extracted from enrichment data."""
+
     # recent_funding | hiring_surge | competitor_mentioned
     # expansion | pain_indicator | tech_stack_match
     signal_type: str
-    description: str        # "Raised $45M Series B in Jan 2024"
-    strength: str           # "strong", "moderate", "weak"
+    description: str  # "Raised $45M Series B in Jan 2024"
+    strength: str  # "strong", "moderate", "weak"
+
+
+class CompanyProfile(SQLModel, table=True):
+    """The user's own company profile — used by AI for context when generating pitches."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    company_name: str
+    website: Optional[str] = None
+    growth_stage: Optional[str] = None  # Pre-Seed, Seed, Series A, Series B+, Public
+    geography: Optional[str] = None  # HQ location
+    value_proposition: Optional[str] = None  # What the company does
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class Lead(SQLModel, table=True):
     """A target company to enrich and pitch."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -69,6 +94,7 @@ class Lead(SQLModel, table=True):
 
 class Product(SQLModel, table=True):
     """A product in the user's catalog — matched against leads by AI."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str
     description: str  # What you sell, clear simple description
@@ -87,18 +113,20 @@ class Product(SQLModel, table=True):
 
 class ProductMatch(SQLModel, table=True):
     """AI-generated match between a Lead and a Product with score and reasoning."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
     product_id: int = Field(foreign_key="product.id")
     match_score: float  # 1-10
     match_reasoning: str  # Why this product fits this lead
-    conversion_likelihood: Optional[str] = None   # "high", "medium", "low"
-    conversion_reasoning: Optional[str] = None     # "Similar profile to 3 known converters..."
+    conversion_likelihood: Optional[str] = None  # "high", "medium", "low"
+    conversion_reasoning: Optional[str] = None  # "Similar profile to 3 known converters..."
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class PitchDeck(SQLModel, table=True):
     """A generated pitch deck for a specific product-lead pair."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
     product_id: int = Field(foreign_key="product.id")
@@ -109,6 +137,7 @@ class PitchDeck(SQLModel, table=True):
 
 class GeneratedEmail(SQLModel, table=True):
     """A generated outreach email for a specific product-lead pair."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
     product_id: int = Field(foreign_key="product.id")
@@ -121,6 +150,7 @@ class GeneratedEmail(SQLModel, table=True):
 
 class VoiceBriefing(SQLModel, table=True):
     """An ElevenLabs voice briefing for call prep."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -130,6 +160,7 @@ class VoiceBriefing(SQLModel, table=True):
 
 class PitchHistory(SQLModel, table=True):
     """Track what pitches worked/didn't for future adaptation."""
+
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)

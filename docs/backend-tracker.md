@@ -1,114 +1,92 @@
-# Backend Tracker — Person A
+# Backend Tracker
 
-## Your Stack
+## Stack
 - **Python 3.12** with **uv** (package manager)
 - **FastAPI** + **uvicorn** (API server)
 - **SQLModel** + **SQLite** (database)
-- **WebSocket** (real-time updates to frontend)
+- **WebSocket** (real-time updates)
 - **anthropic** SDK (Claude API)
-- **linkup-sdk** (web search — uses Person B's optimized queries from `prompts/`)
-- **elevenlabs** (TTS, Phase 3)
-- **stripe** (billing, Phase 3)
+- **linkup-sdk** (web search)
+- **bcrypt** + **python-jose** (auth)
 
-## Setup Commands
+## Setup
 ```bash
 cd /path/to/hack-europe
-uv add fastapi "uvicorn[standard]" sqlmodel linkup-sdk anthropic websockets python-multipart aiosqlite jinja2 python-pptx weasyprint
 uv run uvicorn backend.main:app --reload --port 8000
 ```
 
-## Lint & Type-Check Workflow
-Run after every code change:
+## Lint & Test
 ```bash
-uv run ruff check backend/              # Linter (fast, auto-fixable)
-uv run ruff check backend/ --fix        # Auto-fix what it can
-uv run mypy backend/ --ignore-missing-imports  # Type checker
+uv run ruff check backend/ --fix
+uv run mypy backend/
+uv run pytest backend/tests/ -v    # 60+ tests
 ```
-Run tests:
-```bash
-uv run pytest backend/tests/ -v          # Unit tests (38 tests)
-```
-All three must pass clean before committing. Dev deps: `uv add --dev ruff mypy pytest pytest-asyncio httpx`
 
 ## Environment Variables (`.env`)
 ```
 ANTHROPIC_API_KEY=sk-ant-...
 LINKUP_API_KEY=...
-ELEVENLABS_API_KEY=...      # Phase 3
-STRIPE_SECRET_KEY=sk_test_... # Phase 3
+JWT_SECRET_KEY=...                 # For auth tokens
+ELEVENLABS_API_KEY=...             # Phase 3
+STRIPE_SECRET_KEY=sk_test_...      # Phase 3
 ```
 
 ---
 
-## Phase 1 — Core Enrichment + Product Catalog (Hours 0-8)
+## What's Built
 
-### Files to Create
-- [x] `backend/__init__.py`
-- [x] `backend/main.py` — FastAPI app, CORS, WebSocket manager, Product CRUD, Lead import + list + single enrich endpoint
-- [x] `backend/config.py` — `Settings` class (pydantic-settings) reading from `.env`
-- [x] `backend/models.py` — SQLModel schemas (**see `models.py` already created**)
-- [x] `backend/db.py` — Async SQLite engine (aiosqlite) + session dependency + `init_db()`
-- [x] `backend/enrichment/__init__.py`
-- [x] `backend/enrichment/linkup_search.py` — LinkUp client singleton (lazy init)
-- [x] `backend/enrichment/pipeline.py` — Multi-agent orchestrator with iterative follow-up (max 2 rounds)
-- [x] `backend/enrichment/agents/__init__.py`
-- [x] `backend/enrichment/agents/query_planner.py` — Agent 1: Claude generates tailored search queries per company
-- [x] `backend/enrichment/agents/search_executor.py` — Agent 2: LinkUp parallel search (sourcedAnswer + structured modes)
-- [x] `backend/enrichment/agents/data_extractor.py` — Agent 3: Claude extracts structured Lead fields + gap analysis
-- [x] ~~`backend/enrichment/claude_enricher.py`~~ — **Deleted**: logic moved to `agents/data_extractor.py`
+### Auth (`backend/auth.py`)
+- JWT-based authentication: register, login, token verification
+- `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`
+- Password hashing via bcrypt, tokens via python-jose
+- `get_current_user` FastAPI dependency for protected routes
 
-### API Endpoints — DONE
-```python
-# Product catalog CRUD — all implemented ✅
-POST /api/products          # Bulk import: {"products": [{name, description, ...}]}
-GET  /api/products          # List all products
-GET  /api/products/{id}     # Single product detail
-PUT  /api/products/{id}     # Update a product
-DELETE /api/products/{id}   # Remove a product
+### Product CRUD
+- `POST /api/products` — bulk import
+- `GET /api/products`, `GET /api/products/{id}`, `PUT /api/products/{id}`, `DELETE /api/products/{id}`
 
-# Lead management — all implemented ✅
-POST /api/leads/import      # {"companies": ["Stripe", "Plaid"]} → creates leads + fires enrichment
-GET  /api/leads             # All leads with enrichment data
-GET  /api/leads/{id}        # Single lead detail
-POST /api/leads/{id}/enrich # Re-trigger enrichment for a single lead
+### ICP Discovery (`backend/discovery/`)
+- Claude Sonnet tool-use agent with 4 tools: `search_companies`, `fetch_company_website`, `get_company_details`, `submit_discovered_companies`
+- Takes product catalog → derives ICPs → autonomously searches → creates leads → auto-enriches
+- `POST /api/discovery/run`
 
-# Real-time — implemented ✅
-WS   /ws/updates            # Broadcasts enrichment_start, cell_update, enrichment_complete
-```
+### Multi-Agent Enrichment (`backend/enrichment/`)
+- 3-agent pipeline: Query Planner → Search Executor → Data Extractor
+- Up to 2 rounds (broad + targeted follow-up based on gaps)
+- Semaphore(3) concurrency limit
+- Broadcasts `cell_update` per field via WebSocket
+- `POST /api/leads/import`, `POST /api/leads/{id}/enrich`
 
-### WebSocket Protocol
-When enrichment completes a field for a lead, push:
-```json
-{"type": "cell_update", "lead_id": "abc123", "field": "funding", "value": "Series B, $45M", "status": "complete"}
-```
-When enrichment starts for a lead:
-```json
-{"type": "enrichment_start", "lead_id": "abc123"}
-```
-When all fields done:
-```json
-{"type": "enrichment_complete", "lead_id": "abc123"}
-```
+### Product Matching (`backend/matching/`)
+- One Claude Haiku call per lead with full product catalog
+- Returns ranked matches with scores (1-10), reasoning, conversion likelihood
+- `POST /api/matches/generate`, `GET /api/matches`
 
-### Key Implementation Notes
-- Use `asyncio.create_task()` to run enrichment in background after import endpoint returns
-- Use Person B's queries from `prompts/linkup_queries.py` — import them, don't hardcode queries
-- Claude enricher should return structured JSON matching the Lead model fields (no fit_score — that moves to matching)
-- Store enrichment results in SQLite as they come in (partial updates OK)
-- Product model now has full profile fields (features, industry_focus, pricing_model, etc.) — see `models.py`
+### Pitch Deck Generator (`backend/actions/pitch_deck.py`)
+- 3-stage: Claude → 7 JSON slides → Jinja2 HTML → python-pptx PPTX
+- `POST /api/leads/{id}/pitch-deck?product_id=X`
+- `GET /api/leads/{id}/pitch-deck`, `GET /api/leads/{id}/pitch-deck/download`
+
+### Email Generator (`backend/actions/email_generator.py`)
+- Single Claude call → subject + body
+- `POST /api/leads/{id}/email?product_id=X`
+
+### Analytics (`backend/analytics.py`)
+- SQL aggregations: industry breakdown, avg score by product, top opportunities, signal frequency, score distribution
+- Claude conversion predictions for matches missing `conversion_likelihood`
+- `GET /api/analytics`, `POST /api/analytics/predict`
 
 ---
 
-## Phase 2 — Product Matching + Pitch Deck + Actions (Hours 8-14)
+## Remaining Work
 
-### Files to Create
-- [ ] `backend/actions/__init__.py`
-- [ ] `backend/actions/pitch_deck.py` — Claude → JSON slides → HTML (Jinja2) + PPTX (python-pptx)
-- [ ] `backend/actions/email_generator.py` — Personalized outreach emails
-- [ ] `backend/agent/__init__.py`
-- [ ] `backend/agent/orchestrator.py` — Claude tool-use loop (includes matching logic)
-- [ ] `templates/pitch_deck.html` — Jinja2 template for 16:9 slides
+### Phase 3 — Integrations
+- [ ] `backend/actions/voice_summary.py` — ElevenLabs TTS voice briefing
+- [ ] `POST /api/leads/{id}/voice` endpoint
+- [ ] Stripe billing: checkout session, credit metering, credits endpoint
+- [ ] `POST /api/billing/checkout`, `GET /api/billing/credits`
 
+<<<<<<< HEAD
 ### API Endpoints
 ```python
 # Matching
@@ -196,7 +174,9 @@ Claude plans the sequence and calls tools autonomously.
 ---
 
 ## Phase 4 — Polish (Hours 20-24)
+=======
+### Phase 4 — Polish
+>>>>>>> 8d9f7ae204225a5c5fe19a72a608e654cc029ff5
 - [ ] Pre-cache enrichment + matches for 5 demo companies
-- [ ] Error handling: API failures return graceful errors, don't crash
-- [ ] WebSocket reconnection handling
-- [ ] Rate limiting on enrichment (don't burn all LinkUp credits)
+- [ ] Error handling: graceful API failure responses
+- [ ] Rate limiting on enrichment (don't burn LinkUp credits)

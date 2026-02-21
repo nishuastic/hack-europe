@@ -1,6 +1,6 @@
 # Frontend + Pitch Deck Tracker — Person C + D
 
-## Your Stack
+## Stack
 - **Next.js 15** with App Router (TypeScript)
 - **bun** (package manager + runtime)
 - **AG Grid Community** (spreadsheet UI)
@@ -9,126 +9,127 @@
 
 ## Setup
 ```bash
-cd /path/to/hack-europe
-bunx create-next-app@latest frontend --typescript --tailwind --app --src-dir=false --import-alias="@/*"
 cd frontend
-bun add ag-grid-community ag-grid-react
+bun install
 bun dev  # runs on localhost:3000
 ```
 
-## Backend API (Person A will serve on localhost:8000)
-See full API contract in `docs/architecture.md`. Key endpoints:
+## Backend API (localhost:8000)
+
+See full contract in `docs/architecture.md`. Key endpoints:
 
 ```
-POST   /api/products              → bulk import product catalog
-GET    /api/products              → list all products
-POST   /api/leads/import          → {"companies": ["Stripe", "Plaid"]}
-GET    /api/leads                 → list all leads with enrichment data + matched products
-POST   /api/matches/generate      → trigger AI matching after enrichment
-GET    /api/matches               → list all product-lead matches with scores
-POST   /api/leads/{id}/pitch-deck?product_id=X  → generate pitch deck for product-lead pair
+# Auth
+POST   /api/auth/register           → register user
+POST   /api/auth/login              → login → JWT token
+GET    /api/auth/me                 → current user (requires Bearer token)
+
+# Products
+POST   /api/products                → bulk import product catalog
+GET    /api/products                → list all products
+
+# Discovery
+POST   /api/discovery/run           → ICP discovery (find companies from products)
+
+# Leads
+POST   /api/leads/import            → paste companies → enrichment starts
+GET    /api/leads                   → list all leads with enrichment data
+POST   /api/leads/{id}/enrich       → re-trigger enrichment
+
+# Matching
+POST   /api/matches/generate        → trigger AI matching
+GET    /api/matches                  → list matches (filterable by lead_id, product_id)
+
+# Actions
+POST   /api/leads/{id}/pitch-deck?product_id=X  → generate pitch deck
 GET    /api/leads/{id}/pitch-deck/download       → download PPTX
-POST   /api/leads/{id}/email?product_id=X        → generate email for product-lead pair
-POST   /api/leads/{id}/voice      → generate voice briefing (Phase 3)
-WS     ws://localhost:8000/ws/updates → real-time cell + match updates
+POST   /api/leads/{id}/email?product_id=X        → generate outreach email
+
+# Analytics
+GET    /api/analytics               → aggregate dashboard data
+
+# WebSocket
+WS     ws://localhost:8000/ws/updates → real-time updates
+```
+
+## WebSocket Messages to Handle
+
+```typescript
+// Discovery flow
+msg.type === 'discovery_start'       // Show "discovering..." state
+msg.type === 'discovery_thinking'    // Show agent reasoning
+msg.type === 'company_discovered'    // Add row to grid
+msg.type === 'discovery_complete'    // Done
+
+// Enrichment flow
+msg.type === 'enrichment_start'      // Show loading state for lead
+msg.type === 'agent_thinking'        // Show pipeline reasoning
+msg.type === 'cell_update'           // Update specific cell: {lead_id, field, value}
+msg.type === 'enrichment_complete'   // Remove loading state
+
+// Matching flow
+msg.type === 'matching_start'        // Show "matching..." state
+msg.type === 'match_update'          // Update match columns: {lead_id, product_id, match_score}
+msg.type === 'matching_complete'     // Done
+
+// Predictions
+msg.type === 'prediction_update'     // Update conversion column
 ```
 
 ---
 
-## Phase 1 — Spreadsheet UI + Product Catalog (Hours 0-8)
+## Components to Build
 
-### Person C — Core Components
-- [ ] `app/page.tsx` — main page layout (header, product catalog area, import area, spreadsheet)
-- [ ] `app/layout.tsx` — app shell with dark/light theme base
-- [ ] `components/SpreadsheetGrid.tsx` — AG Grid component
+### Phase 1 — Spreadsheet + Product Catalog
+- [ ] `app/page.tsx` — main layout (header, product catalog, import area, spreadsheet)
+- [ ] `app/layout.tsx` — app shell, dark theme
+- [ ] `components/SpreadsheetGrid.tsx` — AG Grid with enrichment + match columns
 - [ ] `components/LeadImport.tsx` — CSV paste textarea + submit
-- [ ] `components/ProductCatalog.tsx` — Multi-product input form: add/edit/remove products, each with name + description + optional fields (features, industry_focus, pricing_model, etc.)
-- [ ] `lib/api.ts` — API client (fetch wrapper + WebSocket connection)
+- [ ] `components/ProductCatalog.tsx` — Multi-product input form
+- [ ] `lib/api.ts` — API client + WebSocket connection
 
-### Person D — Design + Data
-- [ ] Prepare 20-company test dataset (CSV: one company name per line)
-- [ ] Prepare 3-5 sample products for testing (different industries/sizes)
-- [ ] Design color scheme + branding (suggest: dark theme, blue/green accents)
-- [ ] Write demo script v1
-- [ ] Test UI flows as Person C builds them
+### Phase 2 — Actions + Deck Viewer + Analytics
+- [ ] `components/ActionPanel.tsx` — slide-in panel when row clicked (deck, email, voice)
+- [ ] `components/PitchDeckViewer.tsx` — HTML slide viewer + PPTX download
+- [ ] `components/EmailPreview.tsx` — generated email + copy button
+- [ ] `components/AnalyticsDashboard.tsx` — charts: industry breakdown, score distribution, top opportunities
 
-### AG Grid Column Configuration
+### Phase 3 — Prize Features
+- [ ] `components/AgentThinking.tsx` — discovery/enrichment reasoning display
+- [ ] Audio player for voice briefings
+- [ ] Stripe credits in header + checkout flow
+- [ ] Auth: login/register screens, token storage
+
+### AG Grid Columns
 ```typescript
-// components/SpreadsheetGrid.tsx
 const columnDefs = [
-  { field: 'company_name', headerName: 'Company', width: 150, pinned: 'left' },
-  { field: 'url', headerName: 'URL', width: 180, cellRenderer: 'linkRenderer' },
-  { field: 'description', headerName: 'Description', width: 300, wrapText: true },
-  { field: 'funding', headerName: 'Last Funding', width: 180 },
-  { field: 'industry', headerName: 'Industry', width: 120 },
-  { field: 'revenue', headerName: 'Revenue', width: 120 },
-  { field: 'employees', headerName: 'Employees', width: 100 },
-  { field: 'contacts', headerName: 'Key Contacts', width: 200, cellRenderer: 'contactsRenderer' },
-  { field: 'customers', headerName: 'Customers', width: 200, cellRenderer: 'tagsRenderer' },
-  { field: 'best_match_product', headerName: 'Best Match', width: 150, cellRenderer: 'matchRenderer' },
-  { field: 'best_match_score', headerName: 'Match Score', width: 100, cellRenderer: 'scoreRenderer',
-    sort: 'desc' },
-  { field: 'actions', headerName: 'Actions', width: 150, cellRenderer: 'actionsRenderer',
-    pinned: 'right' },
+  { field: 'company_name', headerName: 'Company', pinned: 'left' },
+  { field: 'description', headerName: 'Description', wrapText: true },
+  { field: 'funding', headerName: 'Last Funding' },
+  { field: 'industry', headerName: 'Industry' },
+  { field: 'revenue', headerName: 'Revenue' },
+  { field: 'employees', headerName: 'Employees' },
+  { field: 'contacts', headerName: 'Key Contacts', cellRenderer: 'contactsRenderer' },
+  { field: 'customers', headerName: 'Customers', cellRenderer: 'tagsRenderer' },
+  { field: 'buying_signals', headerName: 'Signals', cellRenderer: 'signalsRenderer' },
+  { field: 'best_match_product', headerName: 'Best Match', cellRenderer: 'matchRenderer' },
+  { field: 'best_match_score', headerName: 'Score', cellRenderer: 'scoreRenderer', sort: 'desc' },
+  { field: 'conversion_likelihood', headerName: 'Conversion', cellRenderer: 'conversionRenderer' },
+  { field: 'actions', headerName: 'Actions', cellRenderer: 'actionsRenderer', pinned: 'right' },
 ];
 ```
 
-### WebSocket Integration
-```typescript
-// lib/api.ts
-const ws = new WebSocket('ws://localhost:8000/ws/updates');
-
-ws.onmessage = (event) => {
-  const msg = JSON.parse(event.data);
-  if (msg.type === 'cell_update') {
-    // Update the specific cell in AG Grid
-    const rowNode = gridApi.getRowNode(msg.lead_id);
-    rowNode?.setDataValue(msg.field, msg.value);
-  }
-  if (msg.type === 'match_update') {
-    // Update match columns for this lead
-    const rowNode = gridApi.getRowNode(msg.lead_id);
-    rowNode?.setDataValue('best_match_product', msg.product_name);
-    rowNode?.setDataValue('best_match_score', msg.match_score);
-  }
-};
-```
-
-### Cell Renderers to Build
-- **linkRenderer**: clickable URL
-- **contactsRenderer**: show "Jane Doe (CEO)" with LinkedIn icon link
-- **tagsRenderer**: pill/badge list for customers
-- **scoreRenderer**: colored bar (red 1-3, yellow 4-6, green 7-10)
-- **matchRenderer**: show matched product name with score badge
-- **actionsRenderer**: "Pitch Deck" + "Email" buttons per row
-- **loadingRenderer**: spinner while enrichment is in progress for that cell
-
-### Deliverable by Hour 8
-- Add products to catalog → see them listed
-- Paste companies → see them in AG Grid
-- Watch cells fill in real-time via WebSocket (loading spinner → data)
-- After enrichment, trigger matching → watch "Best Match" and "Match Score" columns fill
-- Sortable by match score
-- Looks professional (not a prototype)
-
 ---
 
-## Phase 2 — Pitch Deck + Actions (Hours 8-14)
+## Design Guidelines
+- **Theme:** Dark background (#0f172a), blue accents (#3b82f6), green for high scores (#22c55e)
+- **Font:** Inter or system-ui
+- **Spreadsheet:** `ag-theme-alpine-dark`
+- **Key principle:** This should look like a product, not a hackathon project
 
-### Person C — Action Panel + Deck Viewer + Analytics
-- [ ] `components/ActionPanel.tsx` — slide-in panel from right when row clicked; shows matched product info
-- [ ] `components/PitchDeckViewer.tsx` — renders HTML slides, prev/next nav, fullscreen
-- [ ] `components/EmailPreview.tsx` — shows generated email, copy button
-- [ ] `components/AnalyticsDashboard.tsx` — aggregate data insights (see below)
-
-### Person D — Pitch Deck HTML Template + Design
-- [ ] Design the slide template (16:9 aspect ratio, clean typography)
-- [ ] `templates/pitch_deck.html` — Jinja2 template (Person A renders server-side, but D designs it)
-- [ ] Color scheme for slides (match app branding)
-- [ ] Help C with ActionPanel layout
-
-### ActionPanel Behavior
+## Demo Script (2 minutes)
 ```
+<<<<<<< HEAD
 User clicks row in grid
   → ActionPanel slides in from right (60% width)
   → Shows company summary at top
@@ -279,6 +280,9 @@ This is key for "Adaptable Agent" prize — visibly shows the agent changing its
 ## Demo Script (2 minutes, updated for multi-product matching)
 ```
 0:00 — "Finding clients costs $50k/year per SDR. And matching the RIGHT product to the RIGHT client? That's even harder."
+=======
+0:00 — "Finding clients costs $50k/year per SDR. Matching the RIGHT product to the RIGHT client? Even harder."
+>>>>>>> 8d9f7ae204225a5c5fe19a72a608e654cc029ff5
 0:10 — Add 3 products to catalog (pre-filled for speed)
 0:20 — Paste 5 companies → watch enrichment columns fill live
 0:45 — Watch "Best Match" column populate as AI matches products to companies
@@ -289,12 +293,3 @@ This is key for "Adaptable Agent" prize — visibly shows the agent changing its
 1:50 — Show Stripe credits
 2:00 — "Stick: your AI sales team. Multiple products, perfect matches, personalized pitches."
 ```
-
----
-
-## Design Guidelines
-- **Theme:** Dark background (#0f172a), blue accents (#3b82f6), green for high scores (#22c55e)
-- **Font:** Inter or system-ui (clean, modern)
-- **Spreadsheet:** AG Grid's `ag-theme-alpine-dark`
-- **Slides:** White background, dark text, accent color for highlights
-- **Key principle:** This should look like a product, not a hackathon project

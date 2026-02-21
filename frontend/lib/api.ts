@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:8000';
+const API_BASE = "http://localhost:8000";
 
 export interface Product {
   id: number;
@@ -44,7 +44,7 @@ export interface Contact {
 export interface BuyingSignal {
   signal_type: string;
   description: string;
-  strength: 'strong' | 'moderate' | 'weak';
+  strength: "strong" | "moderate" | "weak";
 }
 
 export interface ProductMatch {
@@ -59,12 +59,31 @@ export interface ProductMatch {
 export type WebSocketMessageHandler = (msg: WSMessage) => void;
 
 export type WSMessage =
-  | { type: 'agent_thinking'; lead_id: number; round: number; action: string; detail: string; queries?: string[] }
-  | { type: 'cell_update'; lead_id: number; field: string; value: unknown }
-  | { type: 'enrichment_start'; lead_id: number; company_name: string }
-  | { type: 'enrichment_complete'; lead_id: number; company_name: string; rounds: number }
-  | { type: 'enrichment_error'; lead_id: number; error: string }
-  | { type: 'match_update'; lead_id: number; product_id: number; match_score: number; match_reasoning: string; product_name: string };
+  | {
+      type: "agent_thinking";
+      lead_id: number;
+      round: number;
+      action: string;
+      detail: string;
+      queries?: string[];
+    }
+  | { type: "cell_update"; lead_id: number; field: string; value: unknown }
+  | { type: "enrichment_start"; lead_id: number; company_name: string }
+  | {
+      type: "enrichment_complete";
+      lead_id: number;
+      company_name: string;
+      rounds: number;
+    }
+  | { type: "enrichment_error"; lead_id: number; error: string }
+  | {
+      type: "match_update";
+      lead_id: number;
+      product_id: number;
+      match_score: number;
+      match_reasoning: string;
+      product_name: string;
+    };
 
 class ApiClient {
   private ws: WebSocket | null = null;
@@ -72,29 +91,29 @@ class ApiClient {
 
   connectWebSocket() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
-    
-    this.ws = new WebSocket('ws://localhost:8000/ws/updates');
-    
+
+    this.ws = new WebSocket("ws://localhost:8000/ws/updates");
+
     this.ws.onopen = () => {
-      console.log('WebSocket connected');
+      console.log("WebSocket connected");
     };
-    
+
     this.ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data) as WSMessage;
-        this.wsHandlers.forEach(handler => handler(msg));
+        this.wsHandlers.forEach((handler) => handler(msg));
       } catch (e) {
-        console.error('Failed to parse WS message:', e);
+        console.error("Failed to parse WS message:", e);
       }
     };
-    
+
     this.ws.onclose = () => {
-      console.log('WebSocket disconnected, reconnecting...');
+      console.log("WebSocket disconnected, reconnecting...");
       setTimeout(() => this.connectWebSocket(), 3000);
     };
-    
+
     this.ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error("WebSocket error:", error);
     };
   }
 
@@ -109,10 +128,10 @@ class ApiClient {
     return data.products;
   }
 
-  async createProduct(product: Omit<Product, 'id'>): Promise<Product> {
+  async createProduct(product: Omit<Product, "id">): Promise<Product> {
     const res = await fetch(`${API_BASE}/api/products`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ products: [product] }),
     });
     const data = await res.json();
@@ -121,21 +140,21 @@ class ApiClient {
 
   async updateProduct(id: number, product: Partial<Product>): Promise<Product> {
     const res = await fetch(`${API_BASE}/api/products/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(product),
     });
     return res.json();
   }
 
   async deleteProduct(id: number): Promise<void> {
-    await fetch(`${API_BASE}/api/products/${id}`, { method: 'DELETE' });
+    await fetch(`${API_BASE}/api/products/${id}`, { method: "DELETE" });
   }
 
-  async importProducts(products: Omit<Product, 'id'>[]): Promise<Product[]> {
+  async importProducts(products: Omit<Product, "id">[]): Promise<Product[]> {
     const res = await fetch(`${API_BASE}/api/products`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ products }),
     });
     const data = await res.json();
@@ -148,10 +167,12 @@ class ApiClient {
     return data.leads;
   }
 
-  async importLeads(companies: string[]): Promise<{ leads_created: number; lead_ids: number[]; status: string }> {
+  async importLeads(
+    companies: string[],
+  ): Promise<{ leads_created: number; lead_ids: number[]; status: string }> {
     const res = await fetch(`${API_BASE}/api/leads/import`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ companies }),
     });
     return res.json();
@@ -163,28 +184,36 @@ class ApiClient {
   }
 
   async triggerEnrichment(leadId: number): Promise<void> {
-    await fetch(`${API_BASE}/api/leads/${leadId}/enrich`, { method: 'POST' });
+    await fetch(`${API_BASE}/api/leads/${leadId}/enrich`, { method: "POST" });
   }
 
   async generateMatches(): Promise<void> {
-    const res = await fetch(`${API_BASE}/api/matches/generate`, { method: 'POST' });
-    if (!res.ok) throw new Error('Failed to generate matches');
+    const res = await fetch(`${API_BASE}/api/matches/generate`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Failed to generate matches");
   }
 
-  async getMatches(leadId?: number, productId?: number): Promise<ProductMatch[]> {
+  async getMatches(
+    leadId?: number,
+    productId?: number,
+  ): Promise<ProductMatch[]> {
     let url = `${API_BASE}/api/matches`;
     const params = new URLSearchParams();
-    if (leadId) params.append('lead_id', leadId.toString());
-    if (productId) params.append('product_id', productId.toString());
+    if (leadId) params.append("lead_id", leadId.toString());
+    if (productId) params.append("product_id", productId.toString());
     if (params.toString()) url += `?${params.toString()}`;
-    
+
     const res = await fetch(url);
     const data = await res.json();
     return data.matches;
   }
 
   async generatePitchDeck(leadId: number, productId: number): Promise<void> {
-    await fetch(`${API_BASE}/api/leads/${leadId}/pitch-deck?product_id=${productId}`, { method: 'POST' });
+    await fetch(
+      `${API_BASE}/api/leads/${leadId}/pitch-deck?product_id=${productId}`,
+      { method: "POST" },
+    );
   }
 
   async getPitchDeck(leadId: number): Promise<string> {
@@ -193,21 +222,71 @@ class ApiClient {
   }
 
   async downloadPitchDeck(leadId: number): Promise<Blob> {
-    const res = await fetch(`${API_BASE}/api/leads/${leadId}/pitch-deck/download`);
+    const res = await fetch(
+      `${API_BASE}/api/leads/${leadId}/pitch-deck/download`,
+    );
     return res.blob();
   }
 
-  async generateEmail(leadId: number, productId: number): Promise<{ subject: string; body: string }> {
-    const res = await fetch(`${API_BASE}/api/leads/${leadId}/email?product_id=${productId}`, { method: 'POST' });
+  async generateEmail(
+    leadId: number,
+    productId: number,
+  ): Promise<{ subject: string; body: string }> {
+    const res = await fetch(
+      `${API_BASE}/api/leads/${leadId}/email?product_id=${productId}`,
+      { method: "POST" },
+    );
     return res.json();
   }
 
   async generateVoice(leadId: number): Promise<void> {
-    await fetch(`${API_BASE}/api/leads/${leadId}/voice`, { method: 'POST' });
+    await fetch(`${API_BASE}/api/leads/${leadId}/voice`, { method: "POST" });
   }
 
   async getAnalytics(): Promise<unknown> {
     const res = await fetch(`${API_BASE}/api/analytics`);
+    return res.json();
+  }
+
+  async runDiscovery(
+    productIds?: number[],
+    maxCompanies: number = 20,
+  ): Promise<{ status: string; max_companies: number }> {
+    const res = await fetch(`${API_BASE}/api/discovery/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_ids: productIds,
+        max_companies: maxCompanies,
+      }),
+    });
+    if (!res.ok) throw new Error("Failed to start discovery");
+    return res.json();
+  }
+
+  async getCompanyProfile(): Promise<{
+    company_name?: string;
+    website?: string;
+    growth_stage?: string;
+    geography?: string;
+    value_proposition?: string;
+  }> {
+    const res = await fetch(`${API_BASE}/api/company-profile`);
+    return res.json();
+  }
+
+  async saveCompanyProfile(profile: {
+    company_name: string;
+    website?: string;
+    growth_stage?: string;
+    geography?: string;
+    value_proposition?: string;
+  }): Promise<unknown> {
+    const res = await fetch(`${API_BASE}/api/company-profile`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(profile),
+    });
     return res.json();
   }
 }
