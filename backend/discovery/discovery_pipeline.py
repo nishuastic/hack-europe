@@ -9,7 +9,7 @@ from sqlmodel import select
 from backend.db import async_session
 from backend.discovery.icp_agent import run_discovery_agent
 from backend.enrichment.pipeline import enrich_leads
-from backend.models import EnrichmentStatus, Lead, Product
+from backend.models import CompanyProfile, EnrichmentStatus, Lead, Product
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,10 @@ async def run_discovery(
             })
             return
 
+        # Load seller company profile (optional)
+        cp_result = await session.execute(select(CompanyProfile))
+        company_profile = cp_result.scalar_one_or_none()
+
     # Broadcast start
     await ws_manager.broadcast({
         "type": "discovery_start",
@@ -50,7 +54,9 @@ async def run_discovery(
 
     try:
         # Run the ICP discovery agent
-        discovered = await run_discovery_agent(products, max_companies, ws_manager)
+        discovered = await run_discovery_agent(
+            products, max_companies, ws_manager, company_profile=company_profile,
+        )
 
         if not discovered:
             logger.warning("Discovery agent returned no companies")

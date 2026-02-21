@@ -10,7 +10,7 @@ import anthropic
 from backend.config import settings
 from backend.discovery.prompts import build_discovery_prompt, build_evaluation_prompt
 from backend.enrichment.linkup_search import _get_client
-from backend.models import Product
+from backend.models import CompanyProfile, Product
 
 logger = logging.getLogger(__name__)
 
@@ -50,18 +50,47 @@ _COMPANY_SEARCH_SCHEMA = json.dumps({
 # ─── Phase 1: Search ──────────────────────────────────────────────────────
 
 
-def _get_query_gen_prompt(products: list[Product]) -> str:
+def _get_query_gen_prompt(
+    products: list[Product],
+    company_profile: CompanyProfile | None = None,
+) -> str:
     """Get the Phase 1 query-generation prompt, preferring the prompts/ override."""
     try:
         from prompts.discovery_prompt import build_prompt
-        return build_prompt(products)
+        base = build_prompt(products)
     except Exception:
-        return build_discovery_prompt(products)
+        base = build_discovery_prompt(products)
+    if company_profile:
+        base = _prepend_company_context(base, company_profile)
+    return base
 
 
-async def _plan_discovery_queries(products: list[Product]) -> list[dict[str, str]]:
+def _prepend_company_context(prompt: str, cp: CompanyProfile) -> str:
+    """Insert a seller company context block before the product catalog."""
+    parts = [f"## Your Company (the seller)\n- **Name:** {cp.company_name}"]
+    if cp.website:
+        parts.append(f"- **Website:** {cp.website}")
+    if cp.value_proposition:
+        parts.append(f"- **Value proposition:** {cp.value_proposition}")
+    if cp.growth_stage:
+        parts.append(f"- **Growth stage:** {cp.growth_stage}")
+    if cp.geography:
+        parts.append(f"- **Geography:** {cp.geography}")
+    block = "\n".join(parts) + "\n\n"
+    # Insert before "## Product Catalog"
+    marker = "## Product Catalog"
+    if marker in prompt:
+        return prompt.replace(marker, block + marker, 1)
+    # Fallback: prepend
+    return block + prompt
+
+
+async def _plan_discovery_queries(
+    products: list[Product],
+    company_profile: CompanyProfile | None = None,
+) -> list[dict[str, str]]:
     """Call Claude to generate targeted search queries for the products."""
-    prompt = _get_query_gen_prompt(products)
+    prompt = _get_query_gen_prompt(products, company_profile)
     try:
         response = await _get_claude_client().messages.create(
             model="claude-haiku-4-5-20251001",
@@ -162,13 +191,14 @@ async def _exec_search_companies(
 async def _search_all_products(
     products: list[Product],
     ws_manager: Any | None = None,
+    company_profile: CompanyProfile | None = None,
 ) -> list[dict[str, Any]]:
     """Phase 1: Run LinkUp searches for all products in parallel, deduplicate."""
     seen_urls: set[str] = set()
     all_candidates: list[dict[str, Any]] = []
 
     # Try Claude-planned queries first, fall back to templates
-    planned = await _plan_discovery_queries(products)
+    planned = await _plan_discovery_queries(products, company_profile)
     tasks: list[tuple[str, str]] = []  # (query, depth)
     if planned:
         for q in planned:
@@ -276,13 +306,14 @@ async def run_discovery_agent(
     products: list[Product],
     max_companies: int,
     ws_manager: Any | None = None,
+    company_profile: CompanyProfile | None = None,
 ) -> list[dict[str, Any]]:
     """Run two-phase discovery: search then evaluate.
 
     Returns a list of discovered company dicts.
     """
     # Phase 1: Search
-    candidates = await _search_all_products(products, ws_manager)
+    candidates = await _search_all_products(products, ws_manager, company_profile)
 
     if not candidates:
         logger.warning("No candidates found in search phase")
