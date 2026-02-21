@@ -442,6 +442,51 @@ def build_prompt() -> tuple[str, str]:
 
 Both agents fall back to inline placeholder prompts if the import fails — so the system works even before Person B delivers. But the inline prompts are basic; Person B's versions should be much more detailed and tested.
 
+### 4. Test Runner — Iterating on Prompts
+
+The test runner lets you run the full 3-agent pipeline (or individual stages) from the CLI without starting the server. Results are saved as JSON for comparison.
+
+**Quick start:**
+```bash
+# From project root (where .env lives):
+
+# Free: iterate on query planner prompt (Claude Haiku only, no LinkUp)
+uv run python -m prompts.test_runner "Stripe" --stage plan
+
+# Run plan + search (costs LinkUp credits, no extraction)
+uv run python -m prompts.test_runner "Stripe" --stage search
+
+# Full pipeline: plan + search + extract (shows completeness table)
+uv run python -m prompts.test_runner "Stripe"
+
+# Multiple companies
+uv run python -m prompts.test_runner "Stripe" "Plaid" "Datadog"
+
+# 5 default companies
+uv run python -m prompts.test_runner
+
+# All 20 test companies
+uv run python -m prompts.test_runner --all
+
+# Don't save results to prompts/results/
+uv run python -m prompts.test_runner "Stripe" --no-save
+```
+
+**Workflow for iterating on query planner prompt:**
+1. Edit `prompts/query_planner_prompt.py`
+2. Run `uv run python -m prompts.test_runner "Stripe" --stage plan`
+3. Check query quality — are they specific? Do they cover all fields?
+4. Repeat until satisfied, then run full pipeline
+
+**Workflow for iterating on extraction prompt:**
+1. Edit `prompts/extraction_prompt.py`
+2. Run `uv run python -m prompts.test_runner "Stripe"` (full pipeline)
+3. Check the extraction table — completeness %, confidence levels, gaps
+4. Compare JSON results in `prompts/results/` across prompt versions
+
+**Comparing prompt versions:**
+Results are saved to `prompts/results/<timestamp>_<company>.json`. To compare two versions, diff the JSON files or look at the `scores` section.
+
 ---
 
 ## Phase 4 — Quality Pass (Hours 20-24)
