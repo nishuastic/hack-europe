@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from backend.auth import create_access_token, get_current_user, hash_password, verify_password
 from backend.db import get_session, init_db
 from backend.discovery.discovery_pipeline import run_discovery
 from backend.enrichment.pipeline import enrich_lead, enrich_leads
@@ -24,6 +25,7 @@ from backend.models import (
     PitchDeck,
     Product,
     ProductMatch,
+    User,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -88,6 +90,48 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.receive_text()  # keep alive
     except WebSocketDisconnect:
         manager.disconnect(ws)
+
+
+# ─── Auth Schemas & Routes ────────────────────────────────────────────
+
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str = ""
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/auth/register")
+async def register(body: RegisterRequest, session: AsyncSession = Depends(get_session)):
+    existing = (await session.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    user = User(email=body.email, hashed_password=hash_password(body.password), name=body.name)
+    session.add(user)
+    await session.commit()
+    await session.refresh(user)
+    assert user.id is not None
+    token = create_access_token(user.id, user.email)
+    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name}}
+
+
+@app.post("/api/auth/login")
+async def login(body: LoginRequest, session: AsyncSession = Depends(get_session)):
+    user = (await session.execute(select(User).where(User.email == body.email))).scalar_one_or_none()
+    if not user or not verify_password(body.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    assert user.id is not None
+    token = create_access_token(user.id, user.email)
+    return {"token": token, "user": {"id": user.id, "email": user.email, "name": user.name}}
+
+
+@app.get("/api/auth/me")
+async def get_me(user: User = Depends(get_current_user)):
+    return {"id": user.id, "email": user.email, "name": user.name}
 
 
 # ─── Request/Response Schemas ─────────────────────────────────────────
