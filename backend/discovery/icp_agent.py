@@ -295,7 +295,7 @@ async def run_discovery_agent(
         logger.info(f"Discovery agent iteration {iteration + 1}")
 
         response = await _get_claude_client().messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-haiku-4-5-20251001",
             max_tokens=4096,
             system=system_prompt,
             tools=TOOLS,
