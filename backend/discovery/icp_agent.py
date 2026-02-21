@@ -35,7 +35,7 @@ _COMPANY_SEARCH_SCHEMA = json.dumps({
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
-                    "url": {"type": "string"},
+                    "url": {"type": "string", "description" : "Websites that have the company's name in the domain name"},
                     "description": {"type": "string"},
                     "industry": {"type": "string"},
                     "company_fit": {"type": "string", "description": "Why the company fits our scope"},
@@ -179,8 +179,13 @@ async def _exec_search_companies(
     """
     client = _get_client()
     try:
+        constrained_query = (
+            f"""{query}. 
+            Do not include companies that sell similar products or services to the vendor.
+            """
+        )
         response = await client.async_search(
-            query=query,
+            query=constrained_query,
             depth="deep" if depth == "deep" else "standard",
             output_type="structured",
             structured_output_schema=_COMPANY_SEARCH_SCHEMA,
