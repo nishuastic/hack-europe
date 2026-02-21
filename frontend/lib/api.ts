@@ -100,6 +100,36 @@ export interface ProductMatch {
   product_name?: string;
 }
 
+export interface LinkedInConnection {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email?: string;
+  company?: string;
+  position?: string;
+  connected_on?: string;
+}
+
+export interface WarmIntroOutreach {
+  intro_message: string;
+  talking_points: string[];
+  context: string;
+  timing_suggestion: string;
+}
+
+export interface LinkedInMatch {
+  id: number;
+  connection_id: number;
+  lead_id: number;
+  match_confidence: string;
+  status: string;
+  outreach_plan?: WarmIntroOutreach;
+  connection_name: string;
+  connection_position?: string;
+  connection_company?: string;
+  lead_company_name: string;
+}
+
 export type WebSocketMessageHandler = (msg: WSMessage) => void;
 
 export type WSMessage =
@@ -131,7 +161,12 @@ export type WSMessage =
   | { type: "discovery_start"; product_count: number; max_companies: number }
   | { type: "discovery_thinking"; iteration: number; detail: string }
   | { type: "discovery_complete"; companies_found: number; lead_ids: number[] }
-  | { type: "company_discovered"; lead_id: number; company_name: string; why_good_fit: string };
+  | { type: "company_discovered"; lead_id: number; company_name: string; why_good_fit: string }
+  | { type: "linkedin_import_start"; total_connections: number; total_leads: number }
+  | { type: "linkedin_match_found"; connection_name: string; lead_id: number; company_name: string; confidence: string }
+  | { type: "linkedin_outreach_generated"; match_id: number; connection_name: string; company_name: string }
+  | { type: "linkedin_import_complete"; total_matches: number; total_outreach_plans: number }
+  | { type: "linkedin_import_error"; error: string };
 
 class ApiClient {
   private ws: WebSocket | null = null;
@@ -489,6 +524,48 @@ class ApiClient {
       body: JSON.stringify(profile),
     });
     return res.json();
+  }
+
+  async uploadLinkedInArchive(file: File): Promise<{ status: string; connections_found: number }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await this.fetchWithAuth(`${API_BASE}/api/linkedin/import`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Upload failed");
+    }
+    return res.json();
+  }
+
+  async importLinkedInDemo(): Promise<{ status: string; connections_found: number }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/linkedin/demo`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error("Failed to start demo import");
+    return res.json();
+  }
+
+  async getLinkedInConnections(): Promise<LinkedInConnection[]> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/linkedin/connections`);
+    const data = await res.json();
+    return data.connections;
+  }
+
+  async getLinkedInMatches(leadId?: number): Promise<LinkedInMatch[]> {
+    let url = `${API_BASE}/api/linkedin/matches`;
+    if (leadId) url += `?lead_id=${leadId}`;
+    const res = await this.fetchWithAuth(url);
+    const data = await res.json();
+    return data.matches;
+  }
+
+  async clearLinkedInConnections(): Promise<void> {
+    await this.fetchWithAuth(`${API_BASE}/api/linkedin/connections`, {
+      method: "DELETE",
+    });
   }
 
   async runDiscovery(

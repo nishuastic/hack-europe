@@ -29,6 +29,7 @@ class UsageEventType(str, Enum):
     MATCHING = "matching"
     PITCH_DECK = "pitch_deck"
     EMAIL = "email"
+    LINKEDIN_OUTREACH = "linkedin_outreach"
 
 
 class UserCredits(SQLModel, table=True):
@@ -84,6 +85,43 @@ class BuyingSignal(BaseModel):
     signal_type: str
     description: str  # "Raised $45M Series B in Jan 2024"
     strength: str  # "strong", "moderate", "weak"
+
+
+class LinkedInMatchStatus(str, Enum):
+    PENDING = "pending"
+    GENERATING = "generating"
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+
+class WarmIntroOutreach(BaseModel):
+    intro_message: str
+    talking_points: list[str]
+    context: str
+    timing_suggestion: str
+
+
+class LinkedInConnection(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    first_name: str
+    last_name: str
+    email: str | None = None
+    company: str | None = None
+    position: str | None = None
+    connected_on: str | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class LinkedInMatch(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    connection_id: int = Field(foreign_key="linkedinconnection.id")
+    lead_id: int = Field(foreign_key="lead.id")
+    match_confidence: str = "exact"
+    outreach_plan: WarmIntroOutreach | None = Field(default=None, sa_column=Column(JSON))
+    status: LinkedInMatchStatus = LinkedInMatchStatus.PENDING
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class CompanyProfile(SQLModel, table=True):
