@@ -77,6 +77,7 @@ class Lead(SQLModel, table=True):
     description: Optional[str] = None
     funding: Optional[str] = None
     industry: Optional[str] = None
+    company_fit: Optional[str] = None
     revenue: Optional[str] = None
     employees: Optional[int] = None
     contacts: Optional[list[Contact]] = Field(default=None, sa_column=Column(JSON))

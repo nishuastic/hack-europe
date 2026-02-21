@@ -46,9 +46,22 @@ would be ideal customers for the products below.
 
 ## Your Task
 
-1. **Derive Ideal Customer Profiles (ICPs):** Analyze the products above and determine \
-what types of companies would benefit most from each product. Consider industry, company \
-size, stage, geography, pain points, and technology usage.
+1. **Derive Ideal Customer Profiles (ICPs):** Analyze the vendor/product profile(s) above (provided in JSON) describing what they sell, who they sell to, what problems they solve, and what makes them different.
+
+   Rules:
+   - Use the vendor JSON as the ONLY source of truth. Do not assume or invent any constraints.
+   - If a detail is not present in the JSON, do not include it.
+
+   Output format (IMPORTANT):
+   - Return exactly TWO paragraphs of plain text.
+   - Paragraph 1: 1–2 sentence summary of the vendor and its offering.
+   - Paragraph 2: The Ideal Customer Profile (ICP) in 3–6 sentences, explicitly covering:
+     - Target industries (if specified)
+     - Geography served (if specified)
+     - Company size/stage (if specified)
+     - Primary buyer roles/titles (if specified)
+     - The problems/pains they likely have (based only on the offering description)
+     - Key success outcome they want (based only on the offering description)
 
 2. **Generate targeted search queries:** For each ICP, generate 2-4 web search queries \
 that would find real companies matching that profile. Be specific and creative — e.g. \
