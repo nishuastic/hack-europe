@@ -14,3 +14,17 @@ wheels/
 
 # Cache files
 *_cache
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS
+.DS_Store
+Thumbs.db
+
+# DB
+*.db
