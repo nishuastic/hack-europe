@@ -46,37 +46,41 @@ would be ideal customers for the products below.
 
 ## Your Task
 
-1. **Derive Ideal Customer Profiles (ICPs):** Analyze the products above and determine \
-what types of companies would benefit most from each product. Consider industry, company \
-size, stage, geography, pain points, and technology usage.
+1. **Derive Ideal Customer Profiles (ICPs):** Analyze the vendor/product profile(s) above (provided in JSON) describing what they sell, who they sell to, what problems they solve, and what makes them different.
 
-2. **Search for matching companies:** Use the `search_companies` tool to find real \
-companies matching each ICP. Generate specific, targeted search queries — e.g. \
+   Rules:
+   - Use the vendor JSON as the ONLY source of truth. Do not assume or invent any constraints.
+   - If a detail is not present in the JSON, do not include it.
+
+   Output format (IMPORTANT):
+   - Return exactly TWO paragraphs of plain text.
+   - Paragraph 1: 1–2 sentence summary of the vendor and its offering.
+   - Paragraph 2: The Ideal Customer Profile (ICP) in 3–6 sentences, explicitly covering:
+     - Target industries (if specified)
+     - Geography served (if specified)
+     - Company size/stage (if specified)
+     - Primary buyer roles/titles (if specified)
+     - The problems/pains they likely have (based only on the offering description)
+     - Key success outcome they want (based only on the offering description)
+
+2. **Generate targeted search queries:** For each ICP, generate 2-4 web search queries \
+that would find real companies matching that profile. Be specific and creative — e.g. \
 "Series B fintech startups in Europe", "mid-market SaaS companies hiring for data engineering", \
 "healthcare companies using legacy ERP systems".
 
-3. **Validate promising companies:** For companies that look like good fits, use \
-`fetch_company_website` to read their website and `get_company_details` to extract \
-structured information. This helps you confirm they're a real match, not just a name.
-
-4. **Iterate for coverage:** If you haven't found enough companies, try different ICP \
-angles, industries, geographies, or search strategies. The `search_companies` tool will \
-automatically exclude companies you've already found.
-
-5. **Submit results:** When you have enough companies (or have exhausted search strategies), \
-call `submit_discovered_companies` with your final list.
-
 ## Rules
 
-- Only submit companies you found via actual search results. NEVER hallucinate or make up \
-company names.
-- Include a `why_good_fit` explanation for every company, referencing specific product \
-features and company characteristics.
-- Aim for diversity: mix of company sizes, sub-industries, and geographies (where applicable).
-- For each company, try to get at least: name, URL, description, and industry. Funding, \
-revenue, and employee count are valuable bonuses.
-- If a search returns no useful results, try rephrasing or a different ICP angle.
-- Do NOT submit the selling company itself as a lead.
+- Aim for diversity: vary company sizes, sub-industries, geographies, and search angles.
+- Use "deep" depth for broad or exploratory queries, "standard" for specific/narrow ones.
+- Include a brief `icp_rationale` for each query explaining what ICP it targets.
+- Do NOT include the selling company itself as a target.
+
+## Output Format
+
+Return ONLY a JSON object (no markdown, no explanation outside the JSON):
+```json
+{{"queries": [{{"query": "...", "depth": "standard", "icp_rationale": "..."}}, ...]}}
+```
 """
 
 
