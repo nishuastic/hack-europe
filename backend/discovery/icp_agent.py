@@ -1,13 +1,14 @@
-"""ICP Discovery Agent — Claude with tool_use to iteratively search for companies."""
+"""ICP Discovery Agent — two-phase: LinkUp search then single Claude evaluation."""
 
+import asyncio
 import json
 import logging
-from typing import Any, Literal
+from typing import Any
 
 import anthropic
 
 from backend.config import settings
-from backend.discovery.prompts import build_discovery_prompt
+from backend.discovery.prompts import build_evaluation_prompt
 from backend.enrichment.linkup_search import _get_client
 from backend.models import Product
 
@@ -23,107 +24,7 @@ def _get_claude_client() -> anthropic.AsyncAnthropic:
     return _aclient
 
 
-# ─── Tool Definitions ─────────────────────────────────────────────────────
-
-TOOLS: list[anthropic.types.ToolParam] = [
-    {
-        "name": "search_companies",
-        "description": (
-            "Search the web for companies matching a query. Returns a list of companies "
-            "with name, URL, description, and industry. Use specific queries like "
-            "'Series B fintech startups in Europe' or 'mid-market SaaS companies using Kubernetes'. "
-            "Already-found URLs are automatically excluded."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "The search query to find matching companies",
-                },
-                "depth": {
-                    "type": "string",
-                    "enum": ["standard", "deep"],
-                    "description": "Search depth: 'standard' for quick results, 'deep' for thorough search",
-                },
-            },
-            "required": ["query"],
-        },
-    },
-    {
-        "name": "fetch_company_website",
-        "description": (
-            "Fetch and read the content of a company's website. Use this to understand "
-            "what the company actually does, their products, and their positioning. "
-            "Returns the page content as text."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "The URL to fetch (e.g. https://example.com or https://example.com/about)",
-                },
-            },
-            "required": ["url"],
-        },
-    },
-    {
-        "name": "get_company_details",
-        "description": (
-            "Get structured details about a specific company: description, industry, "
-            "funding, revenue, employee count. Use after search_companies to fill in "
-            "details for promising matches."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "company_name": {
-                    "type": "string",
-                    "description": "The company name to research",
-                },
-                "company_url": {
-                    "type": "string",
-                    "description": "Optional company URL to help narrow the search",
-                },
-            },
-            "required": ["company_name"],
-        },
-    },
-    {
-        "name": "submit_discovered_companies",
-        "description": (
-            "Submit the final list of discovered companies. Call this when you have found "
-            "enough companies or exhausted search strategies. This ends the discovery process."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "companies": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "company_name": {"type": "string"},
-                            "company_url": {"type": "string"},
-                            "description": {"type": "string"},
-                            "industry": {"type": "string"},
-                            "funding": {"type": "string"},
-                            "revenue": {"type": "string"},
-                            "employees": {"type": "integer"},
-                            "why_good_fit": {"type": "string"},
-                        },
-                        "required": ["company_name", "why_good_fit"],
-                    },
-                    "description": "List of discovered companies with their details",
-                },
-            },
-            "required": ["companies"],
-        },
-    },
-]
-
-# ─── Tool Execution ────────────────────────────────────────────────────────
+# ─── LinkUp Search Schema ─────────────────────────────────────────────────
 
 _COMPANY_SEARCH_SCHEMA = json.dumps({
     "type": "object",
@@ -145,19 +46,25 @@ _COMPANY_SEARCH_SCHEMA = json.dumps({
     "required": ["companies"],
 })
 
-_COMPANY_DETAILS_SCHEMA = json.dumps({
-    "type": "object",
-    "properties": {
-        "company_name": {"type": "string"},
-        "website": {"type": "string"},
-        "description": {"type": "string"},
-        "industry": {"type": "string"},
-        "employees": {"type": "integer"},
-        "funding": {"type": "string"},
-        "revenue": {"type": "string"},
-    },
-    "required": ["company_name"],
-})
+
+# ─── Phase 1: Search ──────────────────────────────────────────────────────
+
+
+def _build_search_queries(product: Product) -> list[str]:
+    """Build 2-3 search queries from a product's ICP signals."""
+    queries: list[str] = []
+    base = product.name
+    if product.industry_focus:
+        queries.append(f"{product.industry_focus} companies that need {base}")
+    if product.company_size_target:
+        queries.append(f"{product.company_size_target} companies looking for {base}")
+    if product.geography:
+        geo = product.geography
+        queries.append(f"{base} potential customers in {geo}")
+    # Always add a generic query
+    desc_snippet = (product.description or "")[:80]
+    queries.append(f"companies that would buy {base} {desc_snippet}")
+    return queries[:3]
 
 
 async def _exec_search_companies(
@@ -165,11 +72,10 @@ async def _exec_search_companies(
 ) -> dict[str, Any]:
     """Execute a company search via LinkUp structured output."""
     client = _get_client()
-    search_depth: Literal["standard", "deep"] = "deep" if depth == "deep" else "standard"
     try:
         response = await client.async_search(
             query=query,
-            depth=search_depth,
+            depth="deep" if depth == "deep" else "standard",
             output_type="structured",
             structured_output_schema=_COMPANY_SEARCH_SCHEMA,
         )
@@ -192,77 +98,110 @@ async def _exec_search_companies(
         return {"companies": [], "error": str(e)}
 
 
-async def _exec_fetch_website(url: str) -> dict[str, Any]:
-    """Fetch a company website via LinkUp."""
-    client = _get_client()
+async def _search_all_products(
+    products: list[Product],
+    ws_manager: Any | None = None,
+) -> list[dict[str, Any]]:
+    """Phase 1: Run LinkUp searches for all products in parallel, deduplicate."""
+    seen_urls: set[str] = set()
+    all_candidates: list[dict[str, Any]] = []
+
+    # Build all search tasks
+    tasks: list[tuple[str, str]] = []  # (query, product_name)
+    for product in products:
+        for query in _build_search_queries(product):
+            tasks.append((query, product.name))
+
+    if ws_manager:
+        await ws_manager.broadcast({
+            "type": "discovery_thinking",
+            "iteration": 1,
+            "detail": f"Searching for candidates with {len(tasks)} queries...",
+        })
+
+    # Run all searches in parallel
+    search_coros = [
+        _exec_search_companies(query, "deep", seen_urls)
+        for query, _ in tasks
+    ]
+    results = await asyncio.gather(*search_coros, return_exceptions=True)
+
+    for raw_result in results:
+        if isinstance(raw_result, BaseException):
+            logger.warning(f"Search task failed: {raw_result}")
+            continue
+        result: dict[str, Any] = raw_result
+        for company in result.get("companies", []):
+            url = company.get("url", "")
+            if url and url in seen_urls:
+                continue
+            if url:
+                seen_urls.add(url)
+            all_candidates.append(company)
+
+    logger.info(f"Phase 1 complete: {len(all_candidates)} candidates from {len(tasks)} searches")
+    return all_candidates
+
+
+# ─── Phase 2: Evaluate ────────────────────────────────────────────────────
+
+
+async def _evaluate_candidates(
+    candidates: list[dict[str, Any]],
+    products: list[Product],
+    max_companies: int,
+    ws_manager: Any | None = None,
+) -> list[dict[str, Any]]:
+    """Phase 2: Single Claude call to evaluate and rank all candidates."""
+    if not candidates:
+        return []
+
+    if ws_manager:
+        await ws_manager.broadcast({
+            "type": "discovery_thinking",
+            "iteration": 2,
+            "detail": f"Evaluating {len(candidates)} candidates with Claude...",
+        })
+
+    prompt = build_evaluation_prompt(products, candidates, max_companies)
+
+    response = await _get_claude_client().messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    # Parse JSON from response
+    first_block = response.content[0] if response.content else None
+    text = first_block.text if first_block and hasattr(first_block, "text") else ""
+    # Extract JSON array from response (handle markdown code blocks)
+    json_str = text
+    if "```" in json_str:
+        # Extract content between code fences
+        start = json_str.find("```")
+        end = json_str.rfind("```")
+        if start != end:
+            inner = json_str[start:end]
+            # Remove the opening fence line
+            inner = inner.split("\n", 1)[1] if "\n" in inner else inner
+            json_str = inner
+    json_str = json_str.strip()
+
     try:
-        response = await client.async_search(
-            query=f"site:{url} about company overview",
-            depth="standard",
-            output_type="sourcedAnswer",
-        )
-        answer = response.output if hasattr(response, "output") else str(response)
-        sources = []
-        if hasattr(response, "sources") and response.sources:
-            sources = [
-                {"name": s.name, "url": s.url, "snippet": s.snippet}
-                for s in response.sources
-            ]
-        return {"content": answer, "sources": sources}
-    except Exception as e:
-        logger.warning(f"fetch_company_website failed for '{url}': {e}")
-        return {"content": "", "error": str(e)}
+        result = json.loads(json_str)
+        if isinstance(result, dict) and "companies" in result:
+            result = result["companies"]
+        if not isinstance(result, list):
+            logger.warning("Claude evaluation returned non-list, wrapping")
+            result = [result]
+        logger.info(f"Phase 2 complete: {len(result)} companies approved")
+        return result  # type: ignore[return-value]
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse Claude evaluation response: {e}\nText: {text[:500]}")
+        return []
 
 
-async def _exec_get_company_details(
-    company_name: str, company_url: str | None = None,
-) -> dict[str, Any]:
-    """Get structured company details via LinkUp."""
-    client = _get_client()
-    query = f"{company_name} company overview funding employees revenue"
-    if company_url:
-        query += f" site:{company_url}"
-    try:
-        response = await client.async_search(
-            query=query,
-            depth="deep",
-            output_type="structured",
-            structured_output_schema=_COMPANY_DETAILS_SCHEMA,
-        )
-        raw = response.output if hasattr(response, "output") else response
-        if isinstance(raw, str):
-            return json.loads(raw)  # type: ignore[return-value]
-        return raw  # type: ignore[return-value]
-    except Exception as e:
-        logger.warning(f"get_company_details failed for '{company_name}': {e}")
-        return {"company_name": company_name, "error": str(e)}
-
-
-async def _execute_tool(
-    name: str, tool_input: dict[str, Any], exclude_urls: set[str],
-) -> dict[str, Any]:
-    """Route a tool call to the appropriate handler."""
-    if name == "search_companies":
-        return await _exec_search_companies(
-            query=tool_input["query"],
-            depth=tool_input.get("depth", "standard"),
-            exclude_urls=exclude_urls,
-        )
-    elif name == "fetch_company_website":
-        return await _exec_fetch_website(url=tool_input["url"])
-    elif name == "get_company_details":
-        return await _exec_get_company_details(
-            company_name=tool_input["company_name"],
-            company_url=tool_input.get("company_url"),
-        )
-    elif name == "submit_discovered_companies":
-        # Terminal tool — just echo back the input
-        return {"status": "submitted", "count": len(tool_input.get("companies", []))}
-    else:
-        return {"error": f"Unknown tool: {name}"}
-
-
-# ─── Agentic Loop ──────────────────────────────────────────────────────────
+# ─── Main Entry Point ─────────────────────────────────────────────────────
 
 
 async def run_discovery_agent(
@@ -270,97 +209,18 @@ async def run_discovery_agent(
     max_companies: int,
     ws_manager: Any | None = None,
 ) -> list[dict[str, Any]]:
-    """Run the ICP discovery agent — Claude with tool_use to find matching companies.
+    """Run two-phase discovery: search then evaluate.
 
     Returns a list of discovered company dicts.
     """
-    system_prompt = build_discovery_prompt(products)
-    messages: list[anthropic.types.MessageParam] = [
-        {
-            "role": "user",
-            "content": (
-                f"Find up to {max_companies} companies that would be ideal customers "
-                f"for the products in the catalog. Use search_companies to discover them, "
-                f"fetch_company_website and get_company_details to validate promising ones, "
-                f"then submit_discovered_companies with your final list."
-            ),
-        },
-    ]
+    # Phase 1: Search
+    candidates = await _search_all_products(products, ws_manager)
 
-    found_urls: set[str] = set()
-    discovered: list[dict[str, Any]] = []
-    max_iterations = 20  # safety cap
+    if not candidates:
+        logger.warning("No candidates found in search phase")
+        return []
 
-    for iteration in range(max_iterations):
-        logger.info(f"Discovery agent iteration {iteration + 1}")
-
-        response = await _get_claude_client().messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=4096,
-            system=system_prompt,
-            tools=TOOLS,
-            messages=messages,
-        )
-
-        # Broadcast thinking (text blocks)
-        for block in response.content:
-            if block.type == "text" and block.text.strip() and ws_manager:
-                await ws_manager.broadcast({
-                    "type": "discovery_thinking",
-                    "iteration": iteration + 1,
-                    "detail": block.text[:500],
-                })
-
-        if response.stop_reason == "end_turn":
-            logger.info("Discovery agent ended (no more tool calls)")
-            break
-
-        if response.stop_reason == "tool_use":
-            tool_results: list[dict[str, Any]] = []
-
-            for block in response.content:
-                if block.type != "tool_use":
-                    continue
-
-                tool_name = block.name
-                tool_input = block.input
-
-                if ws_manager:
-                    await ws_manager.broadcast({
-                        "type": "discovery_thinking",
-                        "iteration": iteration + 1,
-                        "detail": f"Calling {tool_name}: {json.dumps(tool_input)[:200]}",
-                    })
-
-                result = await _execute_tool(tool_name, tool_input, found_urls)
-
-                # Track found URLs from search results
-                if tool_name == "search_companies":
-                    for co in result.get("companies", []):
-                        url = co.get("url")
-                        if url:
-                            found_urls.add(url)
-
-                # Capture final submission
-                if tool_name == "submit_discovered_companies":
-                    raw_companies = tool_input.get("companies", [])
-                    discovered = raw_companies if isinstance(raw_companies, list) else []
-                    logger.info(f"Discovery agent submitted {len(discovered)} companies")
-
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": json.dumps(result),
-                })
-
-            # Append assistant response + tool results to messages
-            assistant_msg: Any = {"role": "assistant", "content": response.content}
-            user_msg: Any = {"role": "user", "content": tool_results}
-            messages.append(assistant_msg)
-            messages.append(user_msg)
-
-        # If we got a submission, we're done
-        if discovered:
-            break
+    # Phase 2: Evaluate with Claude
+    discovered = await _evaluate_candidates(candidates, products, max_companies, ws_manager)
 
     return discovered
