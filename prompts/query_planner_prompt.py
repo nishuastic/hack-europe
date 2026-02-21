@@ -7,7 +7,7 @@ This module must expose ``build_prompt() -> tuple[str, str]`` which returns
 
 * **system_prompt** — the main system prompt for Claude Haiku.  It must
   instruct Claude to return JSON matching
-  ``{"queries": [{"query": "...", "depth": "standard"|"deep", "target_field": "...", "rationale": "..."}]}``.
+  ``{"queries": [{"query": "...", "depth": "standard", "target_field": "...", "rationale": "..."}]}``.
 * **follow_up_addendum** — appended to the system prompt when the pipeline
   does a follow-up round.  It **must** contain the placeholders
   ``{gaps}``, ``{hints}``, and ``{existing_context}`` — the pipeline will
@@ -36,7 +36,7 @@ Return ONLY valid JSON matching this schema:
   "queries": [
     {
       "query": "the search query string",
-      "depth": "standard" or "deep",
+      "depth": "standard",
       "target_field": "which Lead field this targets (description|funding|industry|revenue|...)",
       "rationale": "why this query is useful"
     }
@@ -46,8 +46,7 @@ Return ONLY valid JSON matching this schema:
 Guidelines:
 - Generate 5-8 queries for a fresh research round (no prior context)
 - Generate 2-4 targeted queries for a follow-up round (when gaps and hints are provided)
-- Use "standard" depth for simple factual lookups (company overview, industry)
-- Use "deep" depth for harder-to-find data (contacts, customers, revenue, buying signals)
+- Always use "standard" depth
 - Each query should target a specific field — tag it clearly
 - Make queries specific to the company, not generic templates
 - For contacts, include "CEO", "CTO", "leadership" in the query

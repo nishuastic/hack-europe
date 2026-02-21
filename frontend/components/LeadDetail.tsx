@@ -75,7 +75,6 @@ export default function LeadDetail({
   const [enriching, setEnriching] = useState(false);
   const [generatingDeck, setGeneratingDeck] = useState(false);
   const [generatingEmail, setGeneratingEmail] = useState(false);
-  const [generatingVoice, setGeneratingVoice] = useState(false);
   const [emailContent, setEmailContent] = useState<{
     subject: string;
     body: string;
@@ -148,17 +147,6 @@ export default function LeadDetail({
       console.error("Email generation failed:", err);
     } finally {
       setGeneratingEmail(false);
-    }
-  };
-
-  const handleGenerateVoice = async () => {
-    setGeneratingVoice(true);
-    try {
-      await api.generateVoice(leadId);
-    } catch (err) {
-      console.error("Voice generation failed:", err);
-    } finally {
-      setGeneratingVoice(false);
     }
   };
 
@@ -428,58 +416,6 @@ export default function LeadDetail({
                 <span className="text-[10px] text-slate-400 font-bold uppercase">
                   + 6 More
                 </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Voice briefing */}
-          <div className="space-y-4">
-            <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <span className="material-symbols-outlined text-base">mic</span>{" "}
-              AI Voice Briefing
-            </label>
-            <div className="bg-white border border-slate-200 rounded-lg p-5">
-              <div className="flex items-center gap-5">
-                <button
-                  onClick={handleGenerateVoice}
-                  disabled={generatingVoice}
-                  className="size-12 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-md hover:scale-105 transition-transform disabled:opacity-50"
-                >
-                  <span
-                    className={`material-symbols-outlined text-3xl ${generatingVoice ? "animate-spin" : ""}`}
-                  >
-                    {generatingVoice ? "progress_activity" : "play_arrow"}
-                  </span>
-                </button>
-                <div className="flex-1 space-y-2">
-                  <div className="flex justify-between items-end mb-1">
-                    <span className="text-xs font-semibold">
-                      {lead.company_name.replace(/\s+/g, "_")}_Briefing_v1.mp3
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      01:42 / 03:15
-                    </span>
-                  </div>
-                  <div className="h-1 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-slate-900 w-[42%]" />
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 pt-5 border-t border-slate-100 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-slate-400 font-bold">
-                    SPEAKER:
-                  </span>
-                  <span className="text-xs font-medium">
-                    Professional Male (Neural)
-                  </span>
-                </div>
-                <button className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 hover:text-slate-900 transition-colors">
-                  VIEW SCRIPT{" "}
-                  <span className="material-symbols-outlined text-[16px]">
-                    expand_more
-                  </span>
-                </button>
               </div>
             </div>
           </div>

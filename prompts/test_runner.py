@@ -68,7 +68,7 @@ def _header(title: str, width: int = 60) -> None:
 
 
 def _depth_tag(depth: str) -> str:
-    return "[D]" if depth == "deep" else "[S]"
+    return "[S]"
 
 
 def _print_plan(company: str, plan: SearchPlan) -> None:
@@ -191,10 +191,9 @@ def _save_result(
 # ---------------------------------------------------------------------------
 
 def _estimate_cost(plan: SearchPlan) -> str:
-    standard = sum(1 for q in plan.queries if q.depth == "standard")
-    deep = sum(1 for q in plan.queries if q.depth == "deep")
-    cost = standard * 0.005 + deep * 0.05
-    return f"{standard} standard + {deep} deep ≈ €{cost:.3f} LinkUp"
+    total = len(plan.queries)
+    cost = total * 0.005
+    return f"{total} standard ≈ €{cost:.3f} LinkUp"
 
 
 # ---------------------------------------------------------------------------

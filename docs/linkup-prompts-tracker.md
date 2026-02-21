@@ -1,4 +1,7 @@
-# Prompts Tracker
+# Prompts Tracker — Person B
+
+## Role
+Data quality gatekeeper. Craft and optimize prompts that the backend imports. Each backend agent has an inline fallback prompt, but Person B's versions should be more detailed and tested.
 
 ## Prompt Files
 
@@ -39,8 +42,7 @@ Results saved to `prompts/results/`.
 - [x] `test_discovery.py` — CLI test harness for discovery
 
 ## Remaining Work
-- [ ] Voice briefing prompt (for ElevenLabs)
-- [ ] Extract conversion prediction prompt from inline in `analytics.py` to `prompts/prediction_prompt.py`
-- [ ] Quality pass: run all prompts against 5 demo companies x 3 products, fix issues
+- [ ] Conversion prediction prompt (currently inline in `analytics.py`)
+- [ ] Quality pass: run all prompts against 5 demo companies × 3 products, fix issues
 - [ ] Ensure pitch decks are flawless for demo companies
 - [ ] Prepare 3 backup pitch decks (pre-generated) in case API is slow

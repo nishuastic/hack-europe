@@ -77,7 +77,7 @@ _FIELD_SCHEMAS = {
 async def _run_single_search(query: str, depth: str, target_field: str) -> SearchResult:
     """Execute a single LinkUp search and return a SearchResult."""
     client = _get_client()
-    depth_literal: Literal["standard", "deep"] = "deep" if depth == "deep" else "standard"
+    depth_literal: Literal["standard"] = "standard"
     try:
         if target_field in _STRUCTURED_FIELDS:
             schema_str = json.dumps(_FIELD_SCHEMAS[target_field])

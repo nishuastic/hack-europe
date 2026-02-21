@@ -37,7 +37,7 @@ async def test_execute_searches_parallel():
 
     plan = SearchPlan(queries=[
         SearchQuery("Stripe overview", "standard", "description", "r1"),
-        SearchQuery("Stripe funding", "deep", "funding", "r2"),
+        SearchQuery("Stripe funding", "standard", "funding", "r2"),
         SearchQuery("Stripe news", "standard", "buying_signals", "r3"),
     ])
 
@@ -80,7 +80,7 @@ async def test_execute_searches_structured_for_contacts():
     mock_client.async_search = AsyncMock(return_value=mock_response)
 
     plan = SearchPlan(queries=[
-        SearchQuery("Stripe leadership", "deep", "contacts", "find contacts"),
+        SearchQuery("Stripe leadership", "standard", "contacts", "find contacts"),
     ])
 
     with patch("backend.enrichment.agents.search_executor._get_client", return_value=mock_client):
