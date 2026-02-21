@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from pydantic import BaseModel
 from sqlmodel import JSON, Column, Field, SQLModel
 
 
@@ -56,7 +57,7 @@ class EnrichmentStatus(str, Enum):
     FAILED = "failed"
 
 
-class Contact(SQLModel):
+class Contact(BaseModel):
     """A key contact at a target company."""
 
     name: str
@@ -65,7 +66,7 @@ class Contact(SQLModel):
     email: Optional[str] = None
 
 
-class PitchSlide(SQLModel):
+class PitchSlide(BaseModel):
     """A single slide in a pitch deck."""
 
     slide_number: int
@@ -74,7 +75,7 @@ class PitchSlide(SQLModel):
     speaker_notes: str
 
 
-class BuyingSignal(SQLModel):
+class BuyingSignal(BaseModel):
     """A structured buying signal extracted from enrichment data."""
 
     # recent_funding | hiring_surge | competitor_mentioned
