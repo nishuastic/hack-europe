@@ -1,4 +1,4 @@
-# SalesForge
+# Stick
 
 An AI sales agent that takes your product catalog and target companies, enriches them with deep web research, matches the best product to each company, and generates personalized pitch decks — automatically.
 
