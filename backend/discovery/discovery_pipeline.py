@@ -9,7 +9,7 @@ from sqlmodel import select
 from backend.db import async_session
 from backend.discovery.icp_agent import run_discovery_agent
 from backend.enrichment.pipeline import enrich_leads
-from backend.models import CompanyProfile, EnrichmentStatus, Lead, Product
+from backend.models import CompanyProfile, EnrichmentStatus, GenerationRun, Lead, Product
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,7 @@ async def run_discovery(
     max_companies: int,
     ws_manager: Any,
     user_id: int,
+    generation_run_id: int | None = None,
 ) -> None:
     """Full discovery pipeline: load products -> run agent -> create leads -> enrich.
 
@@ -108,6 +109,7 @@ async def run_discovery(
                     revenue=company.get("revenue"),
                     employees=company.get("employees"),
                     enrichment_status=EnrichmentStatus.PENDING,
+                    generation_run_id=generation_run_id,
                 )
                 session.add(lead)
                 await session.commit()
@@ -123,11 +125,24 @@ async def run_discovery(
                     "why_good_fit": company.get("why_good_fit", ""),
                 })
 
+        # Update GenerationRun on completion
+        if generation_run_id:
+            async with async_session() as session:
+                run = (await session.execute(
+                    select(GenerationRun).where(GenerationRun.id == generation_run_id)
+                )).scalar_one_or_none()
+                if run:
+                    run.lead_count = len(lead_ids)
+                    run.status = "complete"
+                    session.add(run)
+                    await session.commit()
+
         # Broadcast completion
         await ws_manager.broadcast({
             "type": "discovery_complete",
             "companies_found": len(lead_ids),
             "lead_ids": lead_ids,
+            "generation_run_id": generation_run_id,
         })
 
         # Auto-enrich discovered leads
@@ -137,6 +152,19 @@ async def run_discovery(
 
     except Exception as e:
         logger.exception("Discovery pipeline failed")
+        # Update GenerationRun on failure
+        if generation_run_id:
+            try:
+                async with async_session() as session:
+                    run = (await session.execute(
+                        select(GenerationRun).where(GenerationRun.id == generation_run_id)
+                    )).scalar_one_or_none()
+                    if run:
+                        run.status = "failed"
+                        session.add(run)
+                        await session.commit()
+            except Exception:
+                logger.exception("Failed to update GenerationRun status")
         await ws_manager.broadcast({
             "type": "discovery_error",
             "error": str(e),

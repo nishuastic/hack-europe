@@ -39,6 +39,7 @@ from backend.models import (
     CompanyProfile,
     EnrichmentStatus,
     GeneratedEmail,
+    GenerationRun,
     Lead,
     PitchDeck,
     Product,
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 
 
 # ─── WebSocket Manager ───────────────────────────────────────────────
+
 
 class ConnectionManager:
     def __init__(self):
@@ -80,6 +82,7 @@ manager = ConnectionManager()
 
 # ─── App Lifespan ─────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -99,6 +102,7 @@ app.add_middleware(
 
 
 # ─── WebSocket Endpoint ──────────────────────────────────────────────
+
 
 @app.websocket("/ws/updates")
 async def websocket_endpoint(ws: WebSocket):
@@ -196,6 +200,7 @@ async def get_me(user: User = Depends(get_current_user)):
 
 # ─── Request/Response Schemas ─────────────────────────────────────────
 
+
 class ProductCreate(BaseModel):
     name: str
     description: str
@@ -248,6 +253,7 @@ class DiscoveryRequest(BaseModel):
 
 
 # ─── Product CRUD ─────────────────────────────────────────────────────
+
 
 @app.post("/api/products")
 async def import_products(
@@ -342,21 +348,104 @@ async def upsert_company_profile(
     return profile
 
 
+# ─── Generation Runs ─────────────────────────────────────────────────
+
+
+@app.get("/api/generation-runs")
+async def list_generation_runs(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """List all generation runs for the current user."""
+    result = await session.execute(
+        select(GenerationRun).where(GenerationRun.user_id == user.id).order_by(GenerationRun.created_at.desc())  # type: ignore[attr-defined]
+    )
+    return {"runs": result.scalars().all()}
+
+
+@app.get("/api/generation-runs/{run_id}")
+async def get_generation_run(
+    run_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Get a single generation run."""
+    run = (
+        await session.execute(select(GenerationRun).where(GenerationRun.id == run_id, GenerationRun.user_id == user.id))
+    ).scalar_one_or_none()
+    if not run:
+        raise HTTPException(status_code=404, detail="Generation run not found")
+    return run
+
+
 # ─── Discovery ───────────────────────────────────────────────────────
 
 
 @app.post("/api/discovery/run")
-async def run_discovery_endpoint(body: DiscoveryRequest, user: User = Depends(get_current_user)):
-    """Kick off ICP-based company discovery. Fire-and-forget async pipeline."""
+async def run_discovery_endpoint(
+    body: DiscoveryRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Kick off ICP-based company discovery. Creates a GenerationRun, then fire-and-forget."""
     assert user.id is not None
-    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager, user.id))
+
+    # Resolve product names for the run snapshot
+    result = await session.execute(select(Product).where(Product.user_id == user.id))
+    all_products = list(result.scalars().all())
+
+    if body.product_ids:
+        pid_set = set(body.product_ids)
+        selected = [p for p in all_products if p.id in pid_set]
+    else:
+        selected = all_products
+
+    if not selected:
+        raise HTTPException(status_code=400, detail="No products found")
+
+    # Capture full product data as snapshots
+    snapshots = []
+    for p in selected:
+        snapshots.append(
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "features": p.features,
+                "industry_focus": p.industry_focus,
+                "pricing_model": p.pricing_model,
+                "company_size_target": p.company_size_target,
+                "geography": p.geography,
+                "stage": p.stage,
+                "company_name": p.company_name,
+                "website": p.website,
+                "example_clients": p.example_clients,
+                "differentiator": p.differentiator,
+            }
+        )
+
+    run = GenerationRun(
+        user_id=user.id,
+        status="running",
+        product_ids=[p.id for p in selected],
+        product_names=[p.name for p in selected],
+        product_snapshots=snapshots,
+        max_companies=body.max_companies,
+    )
+    session.add(run)
+    await session.commit()
+    await session.refresh(run)
+
+    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager, user.id, generation_run_id=run.id))
     return {
         "status": "discovery_started",
         "max_companies": body.max_companies,
+        "generation_run_id": run.id,
     }
 
 
 # ─── Lead Import + List ───────────────────────────────────────────────
+
 
 @app.post("/api/leads/import")
 async def import_leads(
@@ -378,8 +467,15 @@ async def import_leads(
 
 
 @app.get("/api/leads")
-async def list_leads(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
-    result = await session.execute(select(Lead).where(Lead.user_id == user.id))
+async def list_leads(
+    generation_run_id: int | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    query = select(Lead).where(Lead.user_id == user.id)
+    if generation_run_id is not None:
+        query = query.where(Lead.generation_run_id == generation_run_id)
+    result = await session.execute(query)
     return {"leads": result.scalars().all()}
 
 
@@ -719,9 +815,7 @@ async def get_usage(
     """Get usage history for current user."""
     assert user.id is not None
     result = await session.execute(
-        select(UsageEvent)
-        .where(UsageEvent.user_id == user.id)
-        .order_by(UsageEvent.created_at.desc())  # type: ignore[attr-defined]
+        select(UsageEvent).where(UsageEvent.user_id == user.id).order_by(UsageEvent.created_at.desc())  # type: ignore[attr-defined]
     )
     events = result.scalars().all()
     return {

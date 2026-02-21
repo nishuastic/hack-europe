@@ -60,6 +60,129 @@ export interface BuyingSignal {
   strength: "strong" | "moderate" | "weak";
 }
 
+export interface GenerationRun {
+  id: number;
+  created_at: string;
+  status: string;
+  product_ids: number[];
+  product_names: string[];
+  product_snapshots: ProductSnapshot[];
+  lead_count: number;
+  max_companies: number;
+}
+
+export interface ProductSnapshot {
+  id: number;
+  name: string;
+  description: string;
+  features: string[] | null;
+  industry_focus: string | null;
+  pricing_model: string | null;
+  company_size_target: string | null;
+  geography: string | null;
+  stage: string | null;
+  company_name: string | null;
+  website: string | null;
+  example_clients: string[] | null;
+  differentiator: string | null;
+}
+
+export const MOCK_GENERATION_RUNS: GenerationRun[] = [
+  {
+    id: 1,
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    status: "complete",
+    product_ids: [1, 2],
+    product_names: ["CloudSync Pro", "DataVault Enterprise"],
+    product_snapshots: [
+      {
+        id: 1,
+        name: "CloudSync Pro",
+        description: "Enterprise cloud synchronization platform with real-time collaboration features",
+        features: ["Real-time sync", "Team collaboration", "Version control", "API access"],
+        industry_focus: "Technology",
+        pricing_model: "SaaS (monthly)",
+        company_size_target: "Mid-market",
+        geography: "North America, Europe",
+        stage: "scaling",
+        company_name: "Acme Corp",
+        website: "https://acme.com",
+        example_clients: ["TechStart Inc", "DataFlow"],
+        differentiator: "Fastest sync speed in market",
+      },
+      {
+        id: 2,
+        name: "DataVault Enterprise",
+        description: "Secure data storage and backup solution for enterprises",
+        features: ["End-to-end encryption", "Automated backups", "Disaster recovery"],
+        industry_focus: "Finance, Healthcare",
+        pricing_model: "Annual retainer",
+        company_size_target: "Enterprise",
+        geography: "Global",
+        stage: "enterprise",
+        company_name: "Acme Corp",
+        website: "https://acme.com",
+        example_clients: ["BankFirst", "HealthPlus"],
+        differentiator: "Bank-grade security certification",
+      },
+    ],
+    lead_count: 18,
+    max_companies: 20,
+  },
+  {
+    id: 2,
+    created_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    status: "complete",
+    product_ids: [3],
+    product_names: ["MarketingAI"],
+    product_snapshots: [
+      {
+        id: 3,
+        name: "MarketingAI",
+        description: "AI-powered marketing automation platform",
+        features: ["Campaign optimization", "Audience targeting", "A/B testing"],
+        industry_focus: "E-commerce",
+        pricing_model: "Usage-based",
+        company_size_target: "SMB",
+        geography: "US only",
+        stage: "startup",
+        company_name: "Acme Corp",
+        website: "https://acme.com",
+        example_clients: ["ShopEasy", "RetailMax"],
+        differentiator: "ML-driven optimization",
+      },
+    ],
+    lead_count: 12,
+    max_companies: 15,
+  },
+  {
+    id: 3,
+    created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    status: "failed",
+    product_ids: [1],
+    product_names: ["CloudSync Pro"],
+    product_snapshots: [
+      {
+        id: 1,
+        name: "CloudSync Pro",
+        description: "Enterprise cloud synchronization platform",
+        features: ["Real-time sync", "Team collaboration"],
+        industry_focus: "Technology",
+        pricing_model: "SaaS",
+        company_size_target: "Mid-market",
+        geography: "North America",
+        stage: "scaling",
+        company_name: "Acme Corp",
+        website: "https://acme.com",
+        example_clients: [],
+        differentiator: "Fast sync",
+      },
+    ],
+    lead_count: 0,
+    max_companies: 20,
+  },
+];
+
 export interface ProductMatch {
   id: number;
   lead_id: number;
@@ -98,7 +221,11 @@ export type WSMessage =
       match_score: number;
       match_reasoning: string;
       product_name: string;
-    };
+    }
+  | { type: "discovery_start"; product_count: number; max_companies: number }
+  | { type: "discovery_thinking"; iteration: number; detail: string }
+  | { type: "discovery_complete"; companies_found: number; lead_ids: number[] }
+  | { type: "company_discovered"; lead_id: number; company_name: string; why_good_fit: string };
 
 class ApiClient {
   private ws: WebSocket | null = null;
@@ -322,8 +449,21 @@ class ApiClient {
     return data.products;
   }
 
-  async getLeads(): Promise<Lead[]> {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/leads`);
+  async getGenerationRuns(): Promise<GenerationRun[]> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/generation-runs`);
+    const data = await res.json();
+    return data.runs;
+  }
+
+  async getGenerationRun(id: number): Promise<GenerationRun> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/generation-runs/${id}`);
+    return res.json();
+  }
+
+  async getLeads(generationRunId?: number): Promise<Lead[]> {
+    let url = `${API_BASE}/api/leads`;
+    if (generationRunId) url += `?generation_run_id=${generationRunId}`;
+    const res = await this.fetchWithAuth(url);
     const data = await res.json();
     return data.leads;
   }
