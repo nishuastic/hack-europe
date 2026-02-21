@@ -63,6 +63,7 @@ would be ideal customers for the products below.
      - The problems/pains they likely have (based only on the offering description)
      - Key success outcome they want (based only on the offering description)
 
+
 2. **Generate targeted search queries:** For each ICP, generate 2-4 web search queries \
 that would find real companies matching that profile. Be specific and creative — e.g. \
 "Series B fintech startups in Europe", "mid-market SaaS companies hiring for data engineering", \
