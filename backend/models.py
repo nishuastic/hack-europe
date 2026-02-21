@@ -33,6 +33,7 @@ class UsageEventType(str, Enum):
 
 class UserCredits(SQLModel, table=True):
     """Tracks a user's credit balance and billing IDs."""
+
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", unique=True, index=True)
     credits_remaining: int = 100
@@ -42,6 +43,7 @@ class UserCredits(SQLModel, table=True):
 
 class UsageEvent(SQLModel, table=True):
     """Records each billable action for usage history."""
+
     id: int | None = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     event_type: UsageEventType
@@ -97,12 +99,29 @@ class CompanyProfile(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class GenerationRun(SQLModel, table=True):
+    """A single discovery generation run — tracks which products were used and results."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    status: str = "running"  # "running", "complete", "failed"
+    product_ids: list[int] = Field(default_factory=list, sa_column=Column(JSON))
+    product_names: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    product_snapshots: list[dict] = Field(
+        default_factory=list, sa_column=Column(JSON)
+    )  # Full product data at time of run
+    lead_count: int = 0
+    max_companies: int = 20
+
+
 class Lead(SQLModel, table=True):
     """A target company to enrich and pitch."""
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    generation_run_id: Optional[int] = Field(default=None, foreign_key="generationrun.id", index=True)
 
     # Input fields
     company_name: str

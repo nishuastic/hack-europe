@@ -45,6 +45,8 @@ export interface Lead {
   pitch_deck_generated?: boolean;
   email_generated?: boolean;
   voice_generated?: boolean;
+  best_match_product?: string;
+  best_match_score?: number;
 }
 
 export interface Contact {
@@ -58,6 +60,33 @@ export interface BuyingSignal {
   signal_type: string;
   description: string;
   strength: "strong" | "moderate" | "weak";
+}
+
+export interface GenerationRun {
+  id: number;
+  created_at: string;
+  status: string;
+  product_ids: number[];
+  product_names: string[];
+  product_snapshots: ProductSnapshot[];
+  lead_count: number;
+  max_companies: number;
+}
+
+export interface ProductSnapshot {
+  id: number;
+  name: string;
+  description: string;
+  features: string[] | null;
+  industry_focus: string | null;
+  pricing_model: string | null;
+  company_size_target: string | null;
+  geography: string | null;
+  stage: string | null;
+  company_name: string | null;
+  website: string | null;
+  example_clients: string[] | null;
+  differentiator: string | null;
 }
 
 export interface ProductMatch {
@@ -98,7 +127,11 @@ export type WSMessage =
       match_score: number;
       match_reasoning: string;
       product_name: string;
-    };
+    }
+  | { type: "discovery_start"; product_count: number; max_companies: number }
+  | { type: "discovery_thinking"; iteration: number; detail: string }
+  | { type: "discovery_complete"; companies_found: number; lead_ids: number[] }
+  | { type: "company_discovered"; lead_id: number; company_name: string; why_good_fit: string };
 
 class ApiClient {
   private ws: WebSocket | null = null;
@@ -322,8 +355,25 @@ class ApiClient {
     return data.products;
   }
 
-  async getLeads(): Promise<Lead[]> {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/leads`);
+  async getGenerationRuns(): Promise<GenerationRun[]> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/generation-runs`);
+    const data = await res.json();
+    return data.runs;
+  }
+
+  async getGenerationRun(id: number): Promise<GenerationRun> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/generation-runs/${id}`);
+    return res.json();
+  }
+
+  async getLeads(generationRunId?: number): Promise<Lead[]> {
+    let url = `${API_BASE}/api/leads`;
+    if (generationRunId) url += `?generation_run_id=${generationRunId}`;
+    const res = await this.fetchWithAuth(url);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Failed to fetch leads" }));
+      throw new Error(err.detail || `Error: ${res.status}`);
+    }
     const data = await res.json();
     return data.leads;
   }
@@ -341,6 +391,10 @@ class ApiClient {
 
   async getLead(id: number): Promise<Lead> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/leads/${id}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Failed to fetch lead" }));
+      throw new Error(err.detail || `Error: ${res.status}`);
+    }
     return res.json();
   }
 
