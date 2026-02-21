@@ -172,7 +172,6 @@ async def _exec_search_companies(
         query: str,
         depth: str,
         product_id: Any,
-        exclude_urls: set[str],
 ) -> tuple[Any, dict[str, Any]]:
     """Execute a company search via LinkUp structured output.
 
@@ -192,13 +191,6 @@ async def _exec_search_companies(
         else:
             data = raw
 
-        # Filter out already-found URLs
-        if exclude_urls and "companies" in data:
-            data["companies"] = [
-                c for c in data["companies"]
-                if not c.get("url") or c["url"] not in exclude_urls
-            ]
-
         return product_id, data
     except Exception as e:
         logger.warning(f"search_companies failed for query '{query}': {e}")
@@ -213,10 +205,10 @@ async def _search_all_products(
 ) -> list[dict[str, Any]]:
     """Phase 1: Run LinkUp searches for selected products in parallel.
 
-    Each returned candidate is annotated with `matched_product_id` so the
-    evaluation phase can attribute it to the correct product.
+    Each returned candidate is annotated with `matched_product_ids` (list) so the
+    evaluation phase can attribute it to the correct product(s).
     """
-    seen_urls: set[str] = set()
+    url_to_candidate: dict[str, dict[str, Any]] = {}
     all_candidates: list[dict[str, Any]] = []
     product_id_map = _build_product_id_map(products)
 
@@ -252,7 +244,7 @@ async def _search_all_products(
 
     # Run all searches in parallel
     search_coros = [
-        _exec_search_companies(query, depth, product_id, seen_urls)
+        _exec_search_companies(query, depth, product_id)
         for query, depth, product_id in tasks
     ]
     results = await asyncio.gather(*search_coros, return_exceptions=True)
@@ -270,14 +262,22 @@ async def _search_all_products(
 
         for company in result.get("companies", []):
             url = company.get("url", "")
-            if url and url in seen_urls:
+
+            if url and url in url_to_candidate:
+                # Duplicate URL — merge product association into existing candidate
+                existing = url_to_candidate[url]
+                if product_id not in existing["matched_product_ids"]:
+                    existing["matched_product_ids"].append(product_id)
+                    if matched_product_name and matched_product_name not in existing["matched_product_names"]:
+                        existing["matched_product_names"].append(matched_product_name)
                 continue
-            if url:
-                seen_urls.add(url)
-            # Annotate candidate with the product that surfaced it
-            company["matched_product_id"] = product_id
-            company["matched_product_name"] = matched_product_name
+
+            # New candidate — initialize with list-based product attribution
+            company["matched_product_ids"] = [product_id]
+            company["matched_product_names"] = [matched_product_name] if matched_product_name else []
             all_candidates.append(company)
+            if url:
+                url_to_candidate[url] = company
 
     logger.info(
         f"Phase 1 complete: {len(all_candidates)} candidates from {len(tasks)} searches "

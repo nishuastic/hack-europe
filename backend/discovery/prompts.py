@@ -145,9 +145,9 @@ the best {max_companies} that would be ideal customers for the products below.
 {products_block}
 
 ## Candidate Companies (from web search)
-Each candidate includes a `matched_product_id` field indicating which product's search \
-query surfaced it. Use this as a strong signal for `best_product_match`, but you may \
-override it if a different product is clearly a better fit.
+Each candidate includes `matched_product_ids` (list) indicating which products' search \
+queries surfaced it. Use this as a strong signal for `best_product_matches`, but you may \
+override if different products are clearly a better fit.
 
 {candidates_json}
 
@@ -163,6 +163,6 @@ Each object in the array must have:
 - "description": string (what the company does)
 - "industry": string
 - "why_good_fit": string (reference specific product features and company characteristics)
-- "best_product_match": string (name of the best-matching product)
+- "best_product_matches": list of strings (names of matching products, ordered by best fit)
 
 Return the JSON array now:"""
