@@ -11,7 +11,7 @@ DB:       SQLite via SQLModel
 Realtime: WebSocket (enrichment + matching streams live to cells)
 AI:       Claude (reasoning/generation) + ElevenLabs (voice briefings)
 Search:   LinkUp SDK (web research)
-Billing:  Stripe (usage-based)
+Billing:  Stripe + Paid.ai (usage-based credits)
 ```
 
 ## Directory Structure
@@ -22,8 +22,9 @@ hack-europe/
 │   ├── config.py                    # Settings from env vars
 │   ├── models.py                    # SQLModel schemas (Lead, Product, ProductMatch, PitchDeck, etc.)
 │   ├── db.py                        # SQLite init + session
-│   ├── auth.py                      # JWT auth (register, login, token verification)
+│   ├── auth.py                      # JWT auth (register, login, refresh, verify)
 │   ├── analytics.py                 # SQL aggregations + Claude conversion predictions
+│   ├── billing.py                   # Stripe + Paid.ai billing, credit gating
 │   ├── enrichment/
 │   │   ├── linkup_search.py         # LinkUp client singleton
 │   │   ├── pipeline.py              # Multi-agent orchestrator with iterative follow-up
@@ -33,15 +34,15 @@ hack-europe/
 │   │       └── data_extractor.py    # Agent 3: Claude → structured Lead fields + gap analysis
 │   ├── discovery/
 │   │   ├── prompts.py               # ICP discovery system prompt builder
-│   │   ├── icp_agent.py             # Claude Sonnet tool-use agent (4 tools, iterative search)
+│   │   ├── icp_agent.py             # Claude Sonnet tool-use agent
 │   │   └── discovery_pipeline.py    # Orchestrator: products → agent → leads → auto-enrich
 │   ├── matching/
 │   │   └── pipeline.py              # Claude matches all products against each lead
 │   ├── actions/
 │   │   ├── pitch_deck.py            # Claude → JSON slides → Jinja2 HTML → PPTX
 │   │   └── email_generator.py       # Personalized outreach emails
-│   └── tests/                       # 60+ tests
-├── prompts/                         # Person B's prompts (imported by backend with fallbacks)
+│   └── tests/                       # 69 tests
+├── prompts/                         # Prompt engineering (imported by backend with fallbacks)
 │   ├── query_planner_prompt.py
 │   ├── extraction_prompt.py
 │   ├── discovery_prompt.py
@@ -59,15 +60,14 @@ hack-europe/
 ## Core Pipelines
 
 ### 1. ICP Discovery (Agentic — Claude Sonnet tool-use)
-The discovery agent is the "agentic AI" centerpiece. It's a Claude Sonnet tool-use loop that autonomously finds target companies.
+The discovery agent is the "agentic AI" centerpiece.
 
 ```
 POST /api/discovery/run {product_ids?, max_companies}
   → Load products from DB
   → Build ICP system prompt from product catalog
-  → Claude Sonnet tool-use loop (max 20 iterations):
-      Tools: search_companies, fetch_company_website, get_company_details, submit_discovered_companies
-      Claude autonomously: derives ICPs → searches → validates → submits
+  → Claude Sonnet generates search queries based on ICPs
+  → LinkUp executes queries → returns companies
   → Create Lead rows for each discovered company
   → Auto-trigger enrichment for all discovered leads
   → Broadcasts: discovery_start → discovery_thinking → company_discovered → discovery_complete
@@ -113,61 +113,91 @@ POST /api/leads/{id}/email?product_id=X
   → Returns subject + body
 ```
 
+### 6. Analytics & Predictions
+```
+GET /api/analytics
+  → SQL aggregations: industry breakdown, signal frequency, score distribution,
+    avg match score by product, top 5 opportunities
+
+POST /api/analytics/predict
+  → Claude analyzes enriched leads + buying signals + match scores
+  → Returns conversion_likelihood (high/medium/low) + reasoning per match
+  → Broadcasts prediction_update via WebSocket
+```
+
+### 7. Billing (Stripe + Paid.ai)
+```
+Credit system: 100 free SC on signup
+Costs: Enrichment=5, Matching=2, Pitch Deck=10, Email=1, Voice=3
+
+GET  /api/billing/credits      → balance + plans + packs
+POST /api/billing/subscribe    → tier checkout URL (Starter/Growth/Scale)
+POST /api/billing/buy-credits  → PAYG pack checkout URL (100/500/2000/5000 SC)
+POST /api/billing/webhook      → Stripe webhook (adds credits after payment)
+GET  /api/billing/usage        → usage history audit trail
+```
+
 ## API Contract
 
-### Endpoints (all implemented)
+### All Endpoints (Implemented)
 ```
 # Auth
-POST   /api/auth/register           # Register new user
-POST   /api/auth/login              # Login → JWT token
-GET    /api/auth/me                 # Current user info
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/refresh
+GET    /api/auth/me
 
 # Products
-POST   /api/products                # Bulk import product catalog
-GET    /api/products                # List all products
-GET    /api/products/{id}           # Single product detail
-PUT    /api/products/{id}           # Update a product
-DELETE /api/products/{id}           # Remove a product
+POST   /api/products
+GET    /api/products
+GET    /api/products/{id}
+PUT    /api/products/{id}
+DELETE /api/products/{id}
 
 # Discovery
-POST   /api/discovery/run           # ICP discovery: find leads matching product catalog
+POST   /api/discovery/run
 
 # Leads
-POST   /api/leads/import            # Import company names → creates leads + fires enrichment
-GET    /api/leads                   # List all leads with enrichment data
-GET    /api/leads/{id}              # Single lead detail
-POST   /api/leads/{id}/enrich       # Re-trigger enrichment for one lead
+POST   /api/leads/import
+GET    /api/leads
+GET    /api/leads/{id}
+POST   /api/leads/{id}/enrich
 
 # Matching
-POST   /api/matches/generate        # Trigger AI matching (all enriched leads × all products)
-GET    /api/matches                  # List matches (filterable by lead_id, product_id)
+POST   /api/matches/generate
+GET    /api/matches
 
 # Actions
-POST   /api/leads/{id}/pitch-deck?product_id=X  # Generate pitch deck
-GET    /api/leads/{id}/pitch-deck                # Get existing deck
-GET    /api/leads/{id}/pitch-deck/download       # Download PPTX
-POST   /api/leads/{id}/email?product_id=X        # Generate outreach email
+POST   /api/leads/{id}/pitch-deck?product_id=X
+GET    /api/leads/{id}/pitch-deck
+GET    /api/leads/{id}/pitch-deck/download
+POST   /api/leads/{id}/email?product_id=X
 
 # Analytics
-GET    /api/analytics               # Aggregate analytics dashboard
-POST   /api/analytics/predict       # Claude conversion predictions
+GET    /api/analytics
+POST   /api/analytics/predict
+
+# Billing
+GET    /api/billing/credits
+POST   /api/billing/subscribe
+POST   /api/billing/buy-credits
+POST   /api/billing/webhook
+GET    /api/billing/usage
 
 # WebSocket
-WS     /ws/updates                  # Real-time updates
+WS     /ws/updates
 ```
 
-### Not yet implemented
+### Not Yet Implemented
 ```
-POST   /api/leads/{id}/voice        # ElevenLabs voice briefing (Phase 3)
-POST   /api/billing/checkout        # Stripe checkout (Phase 3)
-GET    /api/billing/credits          # Remaining credits (Phase 3)
+POST   /api/leads/{id}/voice   # ElevenLabs voice briefing
 ```
 
 ### WebSocket Message Types
 ```json
 // Discovery
 {"type": "discovery_start", "product_count": 2, "max_companies": 20}
-{"type": "discovery_thinking", "iteration": 1, "detail": "Calling search_companies: ..."}
+{"type": "discovery_thinking", "iteration": 1, "detail": "..."}
 {"type": "company_discovered", "lead_id": 5, "company_name": "Acme Corp", "why_good_fit": "..."}
 {"type": "discovery_complete", "companies_found": 15, "lead_ids": [5, 6, 7]}
 {"type": "discovery_error", "error": "No products found"}
@@ -179,19 +209,10 @@ GET    /api/billing/credits          # Remaining credits (Phase 3)
 {"type": "enrichment_complete", "lead_id": 1, "company_name": "Stripe", "rounds": 2}
 {"type": "enrichment_error", "lead_id": 1, "error": "..."}
 
-<<<<<<< HEAD
-Match update:
-```json
-{"type": "match_update", "lead_id": 1, "product_id": 2,
- "match_score": 8.5, "match_reasoning": "Strong alignment because...",
- "product_name": "Stick Pro"}
-```
-=======
 // Matching
 {"type": "matching_start", "total_leads": 5, "total_products": 3}
 {"type": "match_update", "lead_id": 1, "product_id": 2, "match_score": 8.5, "match_reasoning": "..."}
 {"type": "matching_complete"}
->>>>>>> 8d9f7ae204225a5c5fe19a72a608e654cc029ff5
 
 // Predictions
 {"type": "prediction_update", "lead_id": 1, "product_id": 2, "conversion_likelihood": "high"}
@@ -200,9 +221,9 @@ Match update:
 ## Prize Strategy
 | Prize | How We Win It |
 |-------|--------------|
-| Agentic AI Track (€1k) | ICP discovery agent: Claude Sonnet + 4 tools, autonomous company search |
-| Best Use of Data (€7k) | LinkUp raw data → structured insights + buying signals + product matching + analytics |
-| Best Use of Claude ($10k credits) | Core reasoning: query planning, extraction, ICP discovery, matching, deck gen |
-| Best Stripe Integration (€3k) | Usage-based billing, pay-per-enrichment/deck |
+| Agentic AI Track (€1k) | ICP discovery agent: Claude Sonnet tool-use, autonomous company search |
+| Best Use of Data (€7k) | LinkUp raw data → structured insights + buying signals + product matching + analytics dashboard |
+| Best Use of Claude ($10k credits) | Core reasoning: query planning, extraction, ICP discovery, matching, deck gen, predictions |
+| Best Stripe Integration (€3k) | Usage-based billing with Stick Credits, checkout sessions, webhook metering, Paid.ai signals |
 | Autonomous Consulting Agent | Discovery agent acts like a senior SDR/consultant |
 | Best Use of ElevenLabs (AirPods) | Voice call-prep briefing per lead |

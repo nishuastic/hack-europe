@@ -115,7 +115,7 @@ curl -X POST http://localhost:8000/api/leads/1/enrich
 uv run ruff check backend/                # Lint
 uv run ruff check backend/ --fix          # Auto-fix
 uv run mypy backend/                      # Type check
-uv run pytest backend/tests/ -v           # Unit tests (38 tests)
+uv run pytest backend/tests/ -v           # Unit tests (69 tests)
 ```
 
 All three must pass before committing.
@@ -126,6 +126,7 @@ All three must pass before committing.
 hack-europe/
 ├── backend/
 │   ├── main.py                 # FastAPI app, all routes, WebSocket
+│   ├── billing.py              # Paid.ai + Stripe billing, credit gating
 │   ├── config.py               # Settings from .env (pydantic-settings)
 │   ├── models.py               # SQLModel schemas (Lead, Product, etc.)
 │   ├── db.py                   # Async SQLite engine + sessions
@@ -162,7 +163,67 @@ hack-europe/
 | `ANTHROPIC_API_KEY` | Yes | Claude API key for AI extraction + generation |
 | `LINKUP_API_KEY` | Yes | LinkUp API key for web research |
 | `ELEVENLABS_API_KEY` | Later | ElevenLabs key for voice briefings |
-| `STRIPE_API_KEY` | Later | Stripe test key for billing |
+| `STRIPE_API_KEY` | Yes | Stripe secret key (`sk_test_...`) |
+| `STRIPE_WEBHOOK_SECRET` | Yes* | Stripe webhook signing secret (`whsec_...`) — see below |
+| `PAID_API_KEY` | Yes | Paid.ai API key for usage tracking + invoicing |
+
+\* Only required if processing credit purchases.
+
+## Billing Setup (Stripe + Paid.ai)
+
+Stick uses **Stick Credits (SC)** as its internal currency. Users get 100 free SC on signup and can buy more via Stripe (subscriptions or one-time packs). Usage is tracked via Paid.ai.
+
+### Credit costs per action
+
+| Action | Cost |
+|--------|------|
+| Enrich Lead | 5 SC |
+| Matching | 2 SC |
+| Pitch Deck | 10 SC |
+| Email | 1 SC |
+| Voice Summary | 3 SC |
+
+### Stripe webhook (required for credit purchases)
+
+The webhook endpoint at `/api/billing/webhook` listens for `checkout.session.completed` and `invoice.paid` events to add credits after payment.
+
+**Local development — use the Stripe CLI:**
+
+```bash
+# Install (macOS)
+brew install stripe/stripe-cli/stripe
+
+# Login to your Stripe account
+stripe login
+
+# Forward webhooks to your local server
+stripe listen --forward-to localhost:8000/api/billing/webhook
+```
+
+This prints a signing secret like `whsec_abc123...`. Add it to your `.env`:
+
+```
+STRIPE_WEBHOOK_SECRET=whsec_abc123...
+```
+
+> Note: The secret changes every time you restart `stripe listen`. Update `.env` accordingly.
+
+**Production — use the Stripe Dashboard:**
+
+1. Go to **Stripe Dashboard → Developers → Webhooks → Add endpoint**
+2. Set URL to `https://yourdomain.com/api/billing/webhook`
+3. Select events: `checkout.session.completed`, `invoice.paid`
+4. Copy the signing secret into your env vars
+
+### Billing API routes
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/api/billing/credits` | Get balance, costs, available plans + packs |
+| `POST` | `/api/billing/subscribe` | Subscribe to a tier (`{"tier": "starter"}`) |
+| `POST` | `/api/billing/buy-credits` | Buy a PAYG pack (`{"pack": "500"}`) |
+| `POST` | `/api/billing/webhook` | Stripe webhook handler |
+| `GET` | `/api/billing/usage` | Usage history for current user |
 
 ## Architecture
 

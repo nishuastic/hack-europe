@@ -25,6 +25,8 @@ def test_build_discovery_prompt_basic():
     assert "TestProduct" in prompt
     assert "A test product for testing" in prompt
     assert "Ideal Customer Profiles" in prompt
+    assert "queries" in prompt  # JSON output format
+    assert "search_companies" not in prompt  # No old tool references
 
 
 def test_build_discovery_prompt_includes_all_fields():
@@ -177,7 +179,7 @@ async def test_discovery_pipeline_creates_leads(mock_async_session, mock_agent, 
     ws_manager = AsyncMock()
 
     from backend.discovery.discovery_pipeline import run_discovery
-    await run_discovery(None, 5, ws_manager)
+    await run_discovery(None, 5, ws_manager, 1)
 
     # Verify agent was called
     mock_agent.assert_called_once()
@@ -208,7 +210,7 @@ async def test_discovery_pipeline_no_products(mock_async_session, mock_agent):
     ws_manager = AsyncMock()
 
     from backend.discovery.discovery_pipeline import run_discovery
-    await run_discovery(None, 5, ws_manager)
+    await run_discovery(None, 5, ws_manager, 1)
 
     mock_agent.assert_not_called()
 
@@ -229,7 +231,7 @@ async def test_discovery_pipeline_empty_results(mock_async_session, mock_agent, 
     ws_manager = AsyncMock()
 
     from backend.discovery.discovery_pipeline import run_discovery
-    await run_discovery(None, 5, ws_manager)
+    await run_discovery(None, 5, ws_manager, 1)
 
     broadcast_calls = ws_manager.broadcast.call_args_list
     message_types = [call[0][0]["type"] for call in broadcast_calls]
@@ -260,3 +262,67 @@ async def test_discovery_endpoint_defaults(client):
     assert response.status_code == 200
     data = response.json()
     assert data["max_companies"] == 20
+
+
+# ─── Claude query planning tests ─────────────────────────────────────────
+
+@pytest.mark.asyncio
+@patch("backend.discovery.icp_agent._get_claude_client")
+async def test_plan_discovery_queries_success(mock_get_client):
+    """Claude returns valid JSON queries."""
+    from backend.discovery.icp_agent import _plan_discovery_queries
+
+    mock_response = MagicMock()
+    mock_block = MagicMock()
+    mock_block.text = (
+        '{"queries": [{"query": "fintech startups Europe",'
+        ' "depth": "deep", "icp_rationale": "Industry match"}]}'
+    )
+    mock_response.content = [mock_block]
+
+    mock_client = AsyncMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_response)
+    mock_get_client.return_value = mock_client
+
+    products = [_make_product(industry_focus="Fintech")]
+    result = await _plan_discovery_queries(products)
+    assert len(result) == 1
+    assert result[0]["query"] == "fintech startups Europe"
+    assert result[0]["depth"] == "deep"
+
+
+@pytest.mark.asyncio
+@patch("backend.discovery.icp_agent._get_claude_client")
+async def test_plan_discovery_queries_bad_json_falls_back(mock_get_client):
+    """Claude returns invalid JSON — function returns empty list."""
+    from backend.discovery.icp_agent import _plan_discovery_queries
+
+    mock_response = MagicMock()
+    mock_block = MagicMock()
+    mock_block.text = "This is not valid JSON at all"
+    mock_response.content = [mock_block]
+
+    mock_client = AsyncMock()
+    mock_client.messages.create = AsyncMock(return_value=mock_response)
+    mock_get_client.return_value = mock_client
+
+    products = [_make_product()]
+    result = await _plan_discovery_queries(products)
+    assert result == []
+
+
+def test_build_search_queries_fallback():
+    """Fallback query builder returns list of dicts with expected keys."""
+    from backend.discovery.icp_agent import _build_search_queries_fallback
+
+    product = _make_product(
+        industry_focus="Fintech",
+        company_size_target="mid-market",
+        geography="Europe",
+    )
+    queries = _build_search_queries_fallback(product)
+    assert len(queries) == 3  # capped at 3
+    for q in queries:
+        assert "query" in q
+        assert "depth" in q
+        assert "icp_rationale" in q

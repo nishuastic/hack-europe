@@ -4,6 +4,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from pydantic import BaseModel
 from sqlmodel import JSON, Column, Field, SQLModel
 
 
@@ -23,6 +24,32 @@ class UserLinkedMixin(SQLModel):
     user_id: int = Field(foreign_key="user.id", index=True)
 
 
+class UsageEventType(str, Enum):
+    ENRICHMENT = "enrichment"
+    MATCHING = "matching"
+    PITCH_DECK = "pitch_deck"
+    EMAIL = "email"
+    VOICE = "voice"
+
+
+class UserCredits(SQLModel, table=True):
+    """Tracks a user's credit balance and billing IDs."""
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", unique=True, index=True)
+    credits_remaining: int = 100
+    paid_customer_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+
+
+class UsageEvent(SQLModel, table=True):
+    """Records each billable action for usage history."""
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    event_type: UsageEventType
+    credits_used: int
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class EnrichmentStatus(str, Enum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
@@ -30,7 +57,7 @@ class EnrichmentStatus(str, Enum):
     FAILED = "failed"
 
 
-class Contact(SQLModel):
+class Contact(BaseModel):
     """A key contact at a target company."""
 
     name: str
@@ -39,7 +66,7 @@ class Contact(SQLModel):
     email: Optional[str] = None
 
 
-class PitchSlide(SQLModel):
+class PitchSlide(BaseModel):
     """A single slide in a pitch deck."""
 
     slide_number: int
@@ -48,7 +75,7 @@ class PitchSlide(SQLModel):
     speaker_notes: str
 
 
-class BuyingSignal(SQLModel):
+class BuyingSignal(BaseModel):
     """A structured buying signal extracted from enrichment data."""
 
     # recent_funding | hiring_surge | competitor_mentioned
@@ -86,6 +113,7 @@ class Lead(SQLModel, table=True):
     description: Optional[str] = None
     funding: Optional[str] = None
     industry: Optional[str] = None
+    company_fit: Optional[str] = None
     revenue: Optional[str] = None
     employees: Optional[int] = None
     contacts: Optional[list[Contact]] = Field(default=None, sa_column=Column(JSON))

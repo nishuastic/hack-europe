@@ -199,7 +199,7 @@ async def generate_all_matches(ws_manager, user_id: int) -> None:
                             ProductMatch.lead_id == lead.id,
                             ProductMatch.product_id == product_id,
                         )
-                    ).scalar_one_or_none()
+                    )).scalar_one_or_none()
                     if existing:
                         await session.delete(existing)
                         await session.flush()
