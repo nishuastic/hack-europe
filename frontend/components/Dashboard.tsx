@@ -147,8 +147,8 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
             Filter
           </button>
           <button className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2">
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Import
+            <span className="material-symbols-outlined text-[18px]">bolt</span>
+            Generate
           </button>
         </div>
       </div>
@@ -227,7 +227,7 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
                     colSpan={8}
                     className="px-6 py-8 text-center text-slate-500"
                   >
-                    No leads yet. Import companies to get started.
+                    No leads yet. Press generate to get started.
                   </td>
                 </tr>
               ) : (

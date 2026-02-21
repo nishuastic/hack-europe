@@ -26,7 +26,7 @@ uv run mypy backend/ --ignore-missing-imports  # Type checker
 ```
 Run tests:
 ```bash
-uv run pytest backend/tests/ -v          # Unit tests (38 tests)
+uv run pytest backend/tests/ -v          # Unit tests (50 tests)
 ```
 All three must pass clean before committing. Dev deps: `uv add --dev ruff mypy pytest pytest-asyncio httpx`
 
@@ -56,6 +56,10 @@ STRIPE_SECRET_KEY=sk_test_... # Phase 3
 - [x] `backend/enrichment/agents/search_executor.py` — Agent 2: LinkUp parallel search (sourcedAnswer + structured modes)
 - [x] `backend/enrichment/agents/data_extractor.py` — Agent 3: Claude extracts structured Lead fields + gap analysis
 - [x] ~~`backend/enrichment/claude_enricher.py`~~ — **Deleted**: logic moved to `agents/data_extractor.py`
+- [x] `backend/discovery/__init__.py`
+- [x] `backend/discovery/prompts.py` — ICP discovery system prompt builder
+- [x] `backend/discovery/icp_agent.py` — Claude Sonnet tool_use agent (4 tools, iterative search)
+- [x] `backend/discovery/discovery_pipeline.py` — Orchestrator: products → agent → leads → auto-enrich
 
 ### API Endpoints — DONE
 ```python
@@ -66,6 +70,9 @@ GET  /api/products/{id}     # Single product detail
 PUT  /api/products/{id}     # Update a product
 DELETE /api/products/{id}   # Remove a product
 
+# ICP Discovery — implemented ✅
+POST /api/discovery/run     # {product_ids?: int[], max_companies: int} → discovers leads matching ICPs
+
 # Lead management — all implemented ✅
 POST /api/leads/import      # {"companies": ["Stripe", "Plaid"]} → creates leads + fires enrichment
 GET  /api/leads             # All leads with enrichment data
@@ -73,7 +80,7 @@ GET  /api/leads/{id}        # Single lead detail
 POST /api/leads/{id}/enrich # Re-trigger enrichment for a single lead
 
 # Real-time — implemented ✅
-WS   /ws/updates            # Broadcasts enrichment_start, cell_update, enrichment_complete
+WS   /ws/updates            # Broadcasts discovery_*, enrichment_start, cell_update, enrichment_complete
 ```
 
 ### WebSocket Protocol

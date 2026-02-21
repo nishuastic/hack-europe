@@ -12,14 +12,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
 from backend.db import get_session, init_db
+from backend.discovery.discovery_pipeline import run_discovery
 from backend.enrichment.pipeline import enrich_lead, enrich_leads
-from backend.models import EnrichmentStatus, Lead, Product
+from backend.models import CompanyProfile, EnrichmentStatus, Lead, Product
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 # ─── WebSocket Manager ───────────────────────────────────────────────
+
 
 class ConnectionManager:
     def __init__(self):
@@ -46,6 +48,7 @@ manager = ConnectionManager()
 
 # ─── App Lifespan ─────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -66,6 +69,7 @@ app.add_middleware(
 
 # ─── WebSocket Endpoint ──────────────────────────────────────────────
 
+
 @app.websocket("/ws/updates")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
@@ -77,6 +81,7 @@ async def websocket_endpoint(ws: WebSocket):
 
 
 # ─── Request/Response Schemas ─────────────────────────────────────────
+
 
 class ProductCreate(BaseModel):
     name: str
@@ -112,11 +117,25 @@ class BulkProductImport(BaseModel):
     products: list[ProductCreate]
 
 
+class DiscoveryRequest(BaseModel):
+    product_ids: list[int] | None = None
+    max_companies: int = 20
+
+
+class CompanyProfileUpsert(BaseModel):
+    company_name: str
+    website: str | None = None
+    growth_stage: str | None = None
+    geography: str | None = None
+    value_proposition: str | None = None
+
+
 class LeadImport(BaseModel):
     companies: list[str]
 
 
 # ─── Product CRUD ─────────────────────────────────────────────────────
+
 
 @app.post("/api/products")
 async def import_products(body: BulkProductImport, session: AsyncSession = Depends(get_session)):
@@ -167,7 +186,46 @@ async def delete_product(product_id: int, session: AsyncSession = Depends(get_se
     return {"deleted": True}
 
 
+# ─── Company Profile ──────────────────────────────────────────────────
+
+
+@app.get("/api/company-profile")
+async def get_company_profile(session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(CompanyProfile))
+    profile = result.scalar_one_or_none()
+    return profile or {}
+
+
+@app.put("/api/company-profile")
+async def upsert_company_profile(body: CompanyProfileUpsert, session: AsyncSession = Depends(get_session)):
+    result = await session.execute(select(CompanyProfile))
+    profile = result.scalar_one_or_none()
+    if profile:
+        for field, value in body.model_dump().items():
+            setattr(profile, field, value)
+    else:
+        profile = CompanyProfile(**body.model_dump())
+    session.add(profile)
+    await session.commit()
+    await session.refresh(profile)
+    return profile
+
+
+# ─── Discovery ───────────────────────────────────────────────────────
+
+
+@app.post("/api/discovery/run")
+async def run_discovery_endpoint(body: DiscoveryRequest):
+    """Kick off ICP-based company discovery. Fire-and-forget async pipeline."""
+    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager))
+    return {
+        "status": "discovery_started",
+        "max_companies": body.max_companies,
+    }
+
+
 # ─── Lead Import + List ───────────────────────────────────────────────
+
 
 @app.post("/api/leads/import")
 async def import_leads(body: LeadImport, session: AsyncSession = Depends(get_session)):

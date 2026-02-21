@@ -433,14 +433,96 @@ def build_prompt() -> tuple[str, str]:
 
 **Imported by:** `backend/enrichment/agents/data_extractor.py`
 
-### 3. Contract Summary
+### 3. `prompts/discovery_prompt.py` (NEW — ICP Discovery)
+
+**What the agent does:** Takes the product catalog, derives Ideal Customer Profiles, then uses Claude Sonnet with 4 tools to iteratively search for matching companies via LinkUp.
+
+**What to create:**
+```python
+def build_prompt(products: list[Product]) -> str:
+    """Return the ICP discovery system prompt.
+
+    Takes the full product catalog and returns a system prompt that instructs
+    Claude to derive ICPs, search for companies, validate them, and submit results.
+    """
+```
+
+**Available tools (defined in backend/discovery/icp_agent.py):**
+- `search_companies(query, depth)` → LinkUp structured → company names + URLs
+- `fetch_company_website(url)` → LinkUp content fetch → page content
+- `get_company_details(company_name, company_url?)` → LinkUp structured → description, industry, funding, revenue, employees
+- `submit_discovered_companies(companies)` → terminal: ends the loop
+
+**Prompt should instruct Claude to:**
+- Analyze products and derive ICPs (industry, size, stage, geography, pain points)
+- Generate specific search queries per ICP
+- Validate promising companies by fetching their website
+- Try different ICP angles if not enough companies found
+- Include `why_good_fit` reasoning per company
+- Never hallucinate — only submit companies from actual search results
+
+**Test with:**
+```bash
+uv run python -m prompts.test_discovery              # Dry run: print prompt
+uv run python -m prompts.test_discovery --run --max 5 # Live run
+```
+
+**Imported by:** `backend/discovery/prompts.py` (falls back to built-in prompt if import fails)
+
+### 4. Contract Summary
 
 | File | Function | Returns | Imported By |
 |------|----------|---------|-------------|
 | `prompts/query_planner_prompt.py` | `build_prompt()` | `tuple[str, str]` (system, follow_up) | `agents/query_planner.py` |
 | `prompts/extraction_prompt.py` | `build_prompt()` | `tuple[str, str]` (system, merge) | `agents/data_extractor.py` |
+| `prompts/discovery_prompt.py` | `build_prompt(products)` | `str` (system prompt) | `discovery/prompts.py` |
 
-Both agents fall back to inline placeholder prompts if the import fails — so the system works even before Person B delivers. But the inline prompts are basic; Person B's versions should be much more detailed and tested.
+All agents fall back to inline placeholder prompts if the import fails — so the system works even before Person B delivers. But the inline prompts are basic; Person B's versions should be much more detailed and tested.
+
+### 4. Test Runner — Iterating on Prompts
+
+The test runner lets you run the full 3-agent pipeline (or individual stages) from the CLI without starting the server. Results are saved as JSON for comparison.
+
+**Quick start:**
+```bash
+# From project root (where .env lives):
+
+# Free: iterate on query planner prompt (Claude Haiku only, no LinkUp)
+uv run python -m prompts.test_runner "Stripe" --stage plan
+
+# Run plan + search (costs LinkUp credits, no extraction)
+uv run python -m prompts.test_runner "Stripe" --stage search
+
+# Full pipeline: plan + search + extract (shows completeness table)
+uv run python -m prompts.test_runner "Stripe"
+
+# Multiple companies
+uv run python -m prompts.test_runner "Stripe" "Plaid" "Datadog"
+
+# 5 default companies
+uv run python -m prompts.test_runner
+
+# All 20 test companies
+uv run python -m prompts.test_runner --all
+
+# Don't save results to prompts/results/
+uv run python -m prompts.test_runner "Stripe" --no-save
+```
+
+**Workflow for iterating on query planner prompt:**
+1. Edit `prompts/query_planner_prompt.py`
+2. Run `uv run python -m prompts.test_runner "Stripe" --stage plan`
+3. Check query quality — are they specific? Do they cover all fields?
+4. Repeat until satisfied, then run full pipeline
+
+**Workflow for iterating on extraction prompt:**
+1. Edit `prompts/extraction_prompt.py`
+2. Run `uv run python -m prompts.test_runner "Stripe"` (full pipeline)
+3. Check the extraction table — completeness %, confidence levels, gaps
+4. Compare JSON results in `prompts/results/` across prompt versions
+
+**Comparing prompt versions:**
+Results are saved to `prompts/results/<timestamp>_<company>.json`. To compare two versions, diff the JSON files or look at the `scores` section.
 
 ---
 

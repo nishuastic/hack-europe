@@ -28,3 +28,5 @@ Thumbs.db
 
 # DB
 *.db
+# Prompt test results (raw API output)
+prompts/results/
