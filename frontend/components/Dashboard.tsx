@@ -15,10 +15,10 @@ const DEMO_LEADS: Lead[] = [
     industry: "Manufacturing",
     employees: 2500,
     revenue: "$500M - $1B",
-    best_match_score: 9.0,
     enrichment_status: "complete",
     pitch_deck_generated: true,
     email_generated: true,
+    voice_generated: true,
   },
   {
     id: 2,
@@ -27,10 +27,10 @@ const DEMO_LEADS: Lead[] = [
     industry: "Technology",
     employees: 120,
     revenue: "$10M - $50M",
-    best_match_score: 8.2,
     enrichment_status: "in_progress",
     pitch_deck_generated: false,
     email_generated: true,
+    voice_generated: false,
   },
   {
     id: 3,
@@ -39,10 +39,10 @@ const DEMO_LEADS: Lead[] = [
     industry: "Transportation",
     employees: 12000,
     revenue: "$2B+",
-    best_match_score: 7.5,
     enrichment_status: "pending",
     pitch_deck_generated: false,
     email_generated: false,
+    voice_generated: false,
   },
   {
     id: 4,
@@ -51,10 +51,10 @@ const DEMO_LEADS: Lead[] = [
     industry: "Software",
     employees: 350,
     revenue: "$50M - $100M",
-    best_match_score: 5.4,
     enrichment_status: "complete",
     pitch_deck_generated: true,
     email_generated: true,
+    voice_generated: true,
   },
   {
     id: 5,
@@ -63,12 +63,12 @@ const DEMO_LEADS: Lead[] = [
     industry: "Defense",
     employees: 6000,
     revenue: "$2.5B",
-    best_match_score: 2.5,
     enrichment_status: "failed",
     pitch_deck_generated: false,
     email_generated: false,
+    voice_generated: false,
   },
-] as Lead[];
+];
 
 const ROW_ICONS = [
   "business",
@@ -101,13 +101,6 @@ function statusLabel(s: string) {
   if (s === "in_progress") return "In Progress";
   if (s === "failed") return "Failed";
   return "Pending";
-}
-
-function barColor(score: number) {
-  if (score >= 8) return "bg-slate-800";
-  if (score >= 6) return "bg-slate-600";
-  if (score >= 4) return "bg-slate-500";
-  return "bg-slate-300";
 }
 
 export default function Dashboard({ onSelectLead }: DashboardProps) {
@@ -162,18 +155,6 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
             l.id === msg.lead_id ? { ...l, enrichment_status: "failed" } : l,
           ),
         );
-      } else if (msg.type === "match_update") {
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === msg.lead_id
-              ? {
-                  ...l,
-                  best_match_score: msg.match_score,
-                  best_match_product: msg.product_name,
-                }
-              : l,
-          ),
-        );
       }
     });
 
@@ -224,7 +205,7 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
         </div>
         <div className="flex gap-3">
           <div className="relative">
-            <button 
+            <button
               onClick={() => setShowFilters(!showFilters)}
               className={`bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2 ${showFilters ? 'bg-slate-50 border-slate-300' : ''}`}
             >
@@ -341,7 +322,7 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-slate-500"
                   >
                     Loading leads...
@@ -350,7 +331,7 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
                     className="px-6 py-8 text-center text-slate-500"
                   >
                     No leads yet. Press generate to get started.
@@ -428,8 +409,12 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
                           mail
                         </span>
                         <span
-                          className="material-symbols-outlined text-[16px] text-slate-300"
-                          title="Pending"
+                          className={`material-symbols-outlined text-[16px] ${lead.voice_generated ? "text-slate-800" : "text-slate-300"}`}
+                          title={
+                            lead.voice_generated
+                              ? "Voice Briefing Generated"
+                              : "Pending"
+                          }
                         >
                           mic
                         </span>

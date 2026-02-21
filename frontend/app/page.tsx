@@ -54,6 +54,7 @@ export default function Home() {
     return (
       <PitchDeckEditor
         leadId={view.leadId}
+        productId={view.productId}
         onBack={() => goTo({ page: "lead-detail", leadId: view.leadId })}
       />
     );

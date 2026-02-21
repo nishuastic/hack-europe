@@ -44,14 +44,14 @@ export interface Lead {
   enrichment_status: string;
   pitch_deck_generated?: boolean;
   email_generated?: boolean;
-  best_match_product?: string;
-  best_match_score?: number;
+  voice_generated?: boolean;
 }
 
 export interface Contact {
   name: string;
   role: string;
   linkedin?: string;
+  email?: string;
 }
 
 export interface BuyingSignal {
@@ -66,6 +66,8 @@ export interface ProductMatch {
   product_id: number;
   match_score: number;
   match_reasoning: string;
+  conversion_likelihood?: string;
+  conversion_reasoning?: string;
   product_name?: string;
 }
 
@@ -377,16 +379,18 @@ class ApiClient {
     );
   }
 
-  async getPitchDeck(leadId: number): Promise<string> {
+  async getPitchDeck(leadId: number, productId?: number): Promise<string> {
+    const params = productId ? `?product_id=${productId}` : "";
     const res = await this.fetchWithAuth(
-      `${API_BASE}/api/leads/${leadId}/pitch-deck`,
+      `${API_BASE}/api/leads/${leadId}/pitch-deck${params}`,
     );
     return res.text();
   }
 
-  async downloadPitchDeck(leadId: number): Promise<Blob> {
+  async downloadPitchDeck(leadId: number, productId?: number): Promise<Blob> {
+    const params = productId ? `?product_id=${productId}` : "";
     const res = await this.fetchWithAuth(
-      `${API_BASE}/api/leads/${leadId}/pitch-deck/download`,
+      `${API_BASE}/api/leads/${leadId}/pitch-deck/download${params}`,
     );
     return res.blob();
   }
