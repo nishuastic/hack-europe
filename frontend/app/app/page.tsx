@@ -89,7 +89,7 @@ export default function AppPage() {
                 runId={view.runId}
                 onBack={() => goTo({ page: "dashboard" })}
                 onSelectLead={(id) =>
-                  goTo({ page: "lead-detail", leadId: id })
+                  goTo({ page: "lead-detail", leadId: id, runId: view.runId })
                 }
               />
             </div>
@@ -117,7 +117,13 @@ export default function AppPage() {
           {view.page === "lead-detail" && (
             <LeadDetail
               leadId={view.leadId}
-              onBack={() => goTo({ page: "dashboard" })}
+              onBack={() => {
+                if (view.runId) {
+                  goTo({ page: "generation-run-detail", runId: view.runId });
+                } else {
+                  goTo({ page: "dashboard" });
+                }
+              }}
               onOpenPitchEditor={(productId) =>
                 goTo({ page: "pitch-editor", leadId: view.leadId, productId })
               }
