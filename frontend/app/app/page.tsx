@@ -15,6 +15,7 @@ import Products from "@/components/Products";
 import ProductEdit from "@/components/ProductEdit";
 import LinkedInImport from "@/components/LinkedInImport";
 import Billing from "@/components/Billing";
+import Analytics from "@/components/Analytics";
 
 export default function AppPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -116,6 +117,11 @@ export default function AppPage() {
           {view.page === "linkedin-import" && (
             <div className="p-4 sm:p-6 md:p-10">
               <LinkedInImport />
+            </div>
+          )}
+          {view.page === "analytics" && (
+            <div className="p-4 sm:p-6 md:p-10">
+              <Analytics />
             </div>
           )}
           {view.page === "billing" && (
