@@ -53,7 +53,6 @@ class BuyingSignal(SQLModel):
 
 class CompanyProfile(SQLModel, table=True):
     """The user's own company profile — used by AI for context when generating pitches."""
-
     id: Optional[int] = Field(default=None, primary_key=True)
     company_name: str
     website: Optional[str] = None
