@@ -26,10 +26,10 @@ stripe.api_key = settings.stripe_api_key
 # ─── Stick Credits — cost per action ─────────────────────────────────
 # Currency: stick_credits (SC). Users buy packs/tiers in EUR, spend SC on actions.
 CREDIT_COSTS: dict[UsageEventType, int] = {
-    UsageEventType.ENRICHMENT: 5,    # 5 SC — deep web research per company
-    UsageEventType.MATCHING: 2,      # 2 SC — AI product-to-lead matching
-    UsageEventType.PITCH_DECK: 10,   # 10 SC — 7-slide personalized deck
-    UsageEventType.EMAIL: 1,         # 1 SC — personalized outreach email
+    UsageEventType.ENRICHMENT: 5,  # 5 SC — deep web research per company
+    UsageEventType.MATCHING: 2,  # 2 SC — AI product-to-lead matching
+    UsageEventType.PITCH_DECK: 10,  # 10 SC — 7-slide personalized deck
+    UsageEventType.EMAIL: 1,  # 1 SC — personalized outreach email
 }
 
 # ─── Tier plans (monthly subscriptions) ──────────────────────────────
@@ -180,12 +180,14 @@ def _emit_signal(event_type: UsageEventType, credits: UserCredits, metadata: dic
 
     try:
         paid_client.signals.create_signals(
-            signals=[{
-                "event_name": event_names[event_type],
-                "customer": {"external_customer_id": str(credits.user_id)},
-                "attribution": {"external_product_id": settings.paid_product_external_id},
-                "data": metadata,
-            }],
+            signals=[
+                {
+                    "event_name": event_names[event_type],
+                    "customer": {"external_customer_id": str(credits.user_id)},
+                    "attribution": {"external_product_id": settings.paid_product_external_id},
+                    "data": metadata,
+                }
+            ],
         )
     except Exception:
         logger.exception("Failed to emit Paid.ai signal for %s", event_type)
@@ -256,6 +258,32 @@ async def handle_stripe_webhook(payload: bytes, sig_header: str, session: AsyncS
             credits_to_add = int(meta["credits"])
             await _add_credits(user_id, credits_to_add, session)
 
+        # Handle tier subscription checkout completion
+        if meta.get("type") == "tier":
+            user_id = int(meta["user_id"])
+            credits_to_add = int(meta["credits"])
+            tier = meta.get("tier")
+            await _add_credits(user_id, credits_to_add, session)
+            await _update_subscription(user_id, data.get("subscription"), "active", tier, session)
+
+    # ── Subscription updated ─────────────────────────────────────────
+    if event["type"] == "customer.subscription.updated":
+        sub = event["data"]["object"]
+        meta = sub.get("metadata", {})
+        if meta.get("type") == "tier" and "user_id" in meta:
+            user_id = int(meta["user_id"])
+            status = sub.get("status")
+            tier = meta.get("tier")
+            await _update_subscription(user_id, sub.id, status, tier, session)
+
+    # ── Subscription canceled ─────────────────────────────────────────
+    if event["type"] == "customer.subscription.deleted":
+        sub = event["data"]["object"]
+        meta = sub.get("metadata", {})
+        if meta.get("type") == "tier" and "user_id" in meta:
+            user_id = int(meta["user_id"])
+            await _update_subscription(user_id, None, "canceled", None, session)
+
     # ── Tier subscription: credits on each invoice paid ──────────────
     if event["type"] == "invoice.paid":
         invoice = event["data"]["object"]
@@ -269,6 +297,25 @@ async def handle_stripe_webhook(payload: bytes, sig_header: str, session: AsyncS
                 await _add_credits(user_id, credits_to_add, session)
 
     return {"status": "ok"}
+
+
+async def _update_subscription(
+    user_id: int,
+    subscription_id: str | None,
+    status: str | None,
+    tier: str | None,
+    session: AsyncSession,
+) -> None:
+    """Update user's subscription info."""
+    result = await session.execute(select(UserCredits).where(UserCredits.user_id == user_id))
+    user_credits = result.scalar_one_or_none()
+    if user_credits:
+        user_credits.stripe_subscription_id = subscription_id
+        user_credits.subscription_status = status
+        user_credits.active_tier = tier
+        session.add(user_credits)
+        await session.commit()
+        logger.info("Updated subscription for user %d: tier=%s, status=%s", user_id, tier, status)
 
 
 async def _add_credits(user_id: int, amount: int, session: AsyncSession) -> None:

@@ -766,6 +766,13 @@ async def get_credits(
         "costs": {k.value: v for k, v in CREDIT_COSTS.items()},
         "tiers": TIER_PLANS,
         "payg_packs": PAYG_PACKS,
+        "subscription": {
+            "active_tier": credits.active_tier,
+            "status": credits.subscription_status,
+            "subscription_id": credits.stripe_subscription_id,
+        }
+        if credits.active_tier
+        else None,
     }
 
 

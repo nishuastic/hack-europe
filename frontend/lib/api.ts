@@ -506,6 +506,43 @@ class ApiClient {
     if (!res.ok) throw new Error("Failed to start discovery");
     return res.json();
   }
+
+  async getBillingCredits(): Promise<{
+    currency: string;
+    credits_remaining: number;
+    costs: Record<string, number>;
+    tiers: Record<string, { label: string; price_id: string; credits: number; eur_display: string; per_credit: string }>;
+    payg_packs: Record<string, { label: string; price_id: string; credits: number; eur_display: string; per_credit: string }>;
+  }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/credits`);
+    return res.json();
+  }
+
+  async createTierCheckout(tier: string): Promise<string> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/subscribe`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier }),
+    });
+    const data = await res.json();
+    return data.checkout_url;
+  }
+
+  async createPaygCheckout(pack: string): Promise<string> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/buy-credits`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pack }),
+    });
+    const data = await res.json();
+    return data.checkout_url;
+  }
+
+  async getCredits(): Promise<{ credits_remaining: number }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/credits`);
+    const data = await res.json();
+    return { credits_remaining: data.credits_remaining };
+  }
 }
 
 export const api = new ApiClient();

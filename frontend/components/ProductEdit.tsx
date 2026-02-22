@@ -42,7 +42,7 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
         setCompanyName(product.company_name || "");
         setWebsite(product.website || "");
         setExampleClients(product.example_clients?.length ? [...product.example_clients, ""] : [""]);
-        setCurrentClients(product.current_clients?.length ? [...product.current_clients, {name: "", website: ""}] : [{name: "", website: ""}]);
+        setCurrentClients((product as any).current_clients?.length ? [...(product as any).current_clients, {name: "", website: ""}] : [{name: "", website: ""}]);
       }
     }).finally(() => setLoadingProduct(false));
   }, [productId]);

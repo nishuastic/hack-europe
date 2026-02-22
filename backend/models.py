@@ -39,6 +39,9 @@ class UserCredits(SQLModel, table=True):
     credits_remaining: int = 100
     paid_customer_id: Optional[str] = None
     stripe_customer_id: Optional[str] = None
+    active_tier: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    subscription_status: Optional[str] = None
 
 
 class UsageEvent(SQLModel, table=True):
