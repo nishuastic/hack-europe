@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, Product } from "@/lib/api";
+import { api, Product, ICPProfile } from "@/lib/api";
 
 interface ProductsProps {
   onEdit: (productId?: number) => void;
@@ -10,14 +10,52 @@ interface ProductsProps {
 export default function Products({ onEdit }: ProductsProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [icpProfiles, setIcpProfiles] = useState<Record<number, ICPProfile>>({});
+  const [icpLoading, setIcpLoading] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     api
       .getProducts()
-      .then(setProducts)
+      .then((prods) => {
+        setProducts(prods);
+        // Load ICP profiles for products with current_clients
+        prods.forEach((p) => {
+          if (p.current_clients && p.current_clients.length > 0) {
+            api.getICPProfile(p.id).then((res) => {
+              if ("status" in res && res.status === "no_icp") return;
+              setIcpProfiles((prev) => ({ ...prev, [p.id]: res as ICPProfile }));
+            }).catch(() => {});
+          }
+        });
+      })
       .catch((err) => console.error("Failed to load products:", err))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleLearnICP = async (e: React.MouseEvent, productId: number) => {
+    e.stopPropagation();
+    setIcpLoading((prev) => ({ ...prev, [productId]: true }));
+    try {
+      await api.learnICP(productId);
+      // Poll for completion
+      const poll = setInterval(async () => {
+        const res = await api.getICPProfile(productId);
+        if ("status" in res && res.status !== "no_icp") {
+          const profile = res as ICPProfile;
+          if (profile.status === "complete" || profile.status === "failed") {
+            clearInterval(poll);
+            setIcpLoading((prev) => ({ ...prev, [productId]: false }));
+            if (profile.status === "complete") {
+              setIcpProfiles((prev) => ({ ...prev, [productId]: profile }));
+            }
+          }
+        }
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to start ICP learning:", err);
+      setIcpLoading((prev) => ({ ...prev, [productId]: false }));
+    }
+  };
 
   return (
     <div className="w-full flex flex-col gap-8 pb-10">
@@ -87,6 +125,33 @@ export default function Products({ onEdit }: ProductsProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {product.current_clients && product.current_clients.length > 0 && (
+                    <button
+                      onClick={(e) => handleLearnICP(e, product.id)}
+                      disabled={!!icpLoading[product.id]}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                        icpProfiles[product.id]
+                          ? "bg-green-50 text-green-700 border border-green-200"
+                          : icpLoading[product.id]
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                            : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+                      }`}
+                      title={
+                        icpProfiles[product.id]
+                          ? icpProfiles[product.id].icp_summary || "ICP learned"
+                          : "Learn ICP from current clients"
+                      }
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {icpProfiles[product.id] ? "check_circle" : icpLoading[product.id] ? "hourglass_top" : "psychology"}
+                      </span>
+                      {icpProfiles[product.id]
+                        ? "ICP Learned"
+                        : icpLoading[product.id]
+                          ? "Learning..."
+                          : "Learn ICP"}
+                    </button>
+                  )}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -133,6 +198,30 @@ export default function Products({ onEdit }: ProductsProps) {
                         {f}
                       </span>
                     ))}
+                  </div>
+                )}
+                {/* ICP Summary Card */}
+                {icpProfiles[product.id] && icpProfiles[product.id].icp_summary && (
+                  <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="material-symbols-outlined text-[14px] text-blue-600">psychology</span>
+                      <span className="text-xs font-semibold text-blue-700">Ideal Customer Profile</span>
+                      <span className="text-[10px] text-blue-500 ml-1">
+                        ({icpProfiles[product.id].customers_researched} clients analyzed)
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      {icpProfiles[product.id].icp_summary}
+                    </p>
+                    {icpProfiles[product.id].target_industries && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {icpProfiles[product.id].target_industries!.map((ind, i) => (
+                          <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
+                            {ind}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

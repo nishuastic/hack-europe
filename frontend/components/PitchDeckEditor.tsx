@@ -285,55 +285,6 @@ export default function PitchDeckEditor({
               </div>
             </div>
 
-            {/* Log interaction */}
-            <div className="p-5 border-t border-slate-200 bg-white">
-              <h4 className="text-xs font-semibold text-slate-900 mb-4 uppercase tracking-widest flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-                Log Interaction
-              </h4>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1.5 font-medium">
-                    Outcome
-                  </label>
-                  <div className="relative">
-                    <select className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-md pl-3 pr-10 py-2 text-sm text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900 transition-shadow cursor-pointer">
-                      <option>Meeting Booked</option>
-                      <option>Interested (Follow-up)</option>
-                      <option>Not Interested</option>
-                      <option>Rescheduled</option>
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
-                      <span className="material-symbols-outlined text-lg">
-                        expand_more
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1.5 font-medium">
-                    Follow-up Priority
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button className="py-1.5 border border-slate-200 rounded-md text-xs font-medium text-slate-600 hover:border-slate-400 hover:text-slate-900 transition-colors bg-white">
-                      Low
-                    </button>
-                    <button className="py-1.5 border border-slate-900 bg-slate-900 text-white rounded-md text-xs font-medium transition-colors shadow-sm">
-                      Medium
-                    </button>
-                    <button className="py-1.5 border border-slate-200 rounded-md text-xs font-medium text-slate-600 hover:border-red-500 hover:text-red-600 transition-colors bg-white">
-                      High
-                    </button>
-                  </div>
-                </div>
-                <button className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white font-medium py-2 px-4 rounded-md shadow-sm transition-all active:scale-[0.98] text-sm mt-2">
-                  <span className="material-symbols-outlined text-[18px]">
-                    save_as
-                  </span>
-                  Save Outcome
-                </button>
-              </div>
-            </div>
           </div>
         </aside>
       </div>

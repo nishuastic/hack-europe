@@ -180,10 +180,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
           <h1
             ref={heroRef.ref}
-            className={`text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-slate-900 leading-[1.08] transition-all duration-1000 transform ${
+            className={`text-5xl sm:text-6xl lg:text-7xl font-heading font-bold tracking-tight text-slate-900 leading-[1.08] transition-all duration-1000 transform ${
               heroRef.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}
-            style={{ fontFamily: 'Luben Regular' }}
           >
             Spend minutes,
             <br />
@@ -192,7 +191,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             client prospects
           </h1>
 
-          <p className="mt-6 text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-6 text-lg sm:text-xl font-heading text-slate-500 max-w-2xl mx-auto leading-relaxed">
             Add your products, discover target companies, and get AI-generated
             pitch decks and outreach — all matched to the right buyer, automatically.
           </p>
@@ -351,9 +350,6 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                       <span className="material-symbols-outlined text-[16px]">
                         mail
                       </span>
-                      <span className="material-symbols-outlined text-[16px]">
-                        mic
-                      </span>
                     </span>
                   </div>
                 ))}
@@ -366,6 +362,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* Logos / social proof */}
       <section className="py-12 border-y border-slate-200 bg-white">
         <div className="max-w-5xl mx-auto px-6 text-center">
+<<<<<<< HEAD
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6">
             Built with leading AI and data infrastructure
           </p>
@@ -382,6 +379,16 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <span className="text-lg font-bold text-gray- tracking-tight">
               ElevenLabs
             </span>
+=======
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-8">
+            Built with leading AI and data infrastructure
+          </p>
+          <div className="flex items-center justify-center gap-12 sm:gap-20 flex-wrap">
+            <img src="/logos/anthropic.svg" alt="Anthropic" className="h-6 opacity-50 hover:opacity-80 transition-opacity" />
+            <img src="/logos/linkup.png" alt="LinkUp" className="h-7 opacity-50 hover:opacity-80 transition-opacity" />
+            <img src="/logos/stripe.svg" alt="Stripe" className="h-8 opacity-50 hover:opacity-80 transition-opacity" />
+            <img src="/logos/paidai.png" alt="Paid.ai" className="h-7 opacity-50 hover:opacity-80 transition-opacity" />
+>>>>>>> origin
           </div>
         </div>
       </section>
@@ -398,12 +405,20 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
+<<<<<<< HEAD
             <p className="text-xs font-semibold text-black larayck-500uppercase tracking-widest mb-3">
               Features
             </p>
             <h2
               className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
               style={{ fontFamily: "Luben Regular" }}
+=======
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+              Features
+            </p>
+            <h2
+              className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900"
+>>>>>>> origin
             >
               {typedText.split("\n").map((line, i) => (
                 <span key={i}>
@@ -448,9 +463,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 desc: "Personalized cold emails that reference specific company signals and pain points. Copy, tweak, and send.",
               },
               {
-                icon: "mic",
-                title: "Voice Briefings",
-                desc: "AI-generated voice summaries for each lead, so your reps can prep for calls in 60 seconds flat.",
+                icon: "payments",
+                title: "Usage-Based Billing",
+                desc: "Pay only for what you use. Stripe-powered credits for enrichments, matches, and deck generation.",
               },
             ].map((feature, i) => (
               <div
@@ -464,8 +479,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                   transitionDelay: featuresRef.isVisible ? `${i * 100}ms` : "0ms",
                 }}
               >
-                <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center mb-4">
-                  <span className="material-symbols-outlined text-xl text-white">
+                <div className="mb-4">
+                  <span className="material-symbols-outlined text-3xl text-slate-900">
                     {feature.icon}
                   </span>
                 </div>
@@ -497,8 +512,12 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               How it works
             </p>
             <h2
+<<<<<<< HEAD
               className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
               style={{ fontFamily: "Luben Regular" }}
+=======
+              className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900"
+>>>>>>> origin
             >
               Three steps to your first pitch
             </h2>
@@ -539,14 +558,18 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 <div className="text-5xl font-bold text-gray-400 mb-4">
                   {step.step}
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center mx-auto mb-4">
-                  <span className="material-symbols-outlined text-2xl text-white">
+                <div className="mx-auto mb-4">
+                  <span className="material-symbols-outlined text-4xl text-slate-900">
                     {step.icon}
                   </span>
                 </div>
                 <h3
+<<<<<<< HEAD
                   className="text-lg font-semibold text-slate-900 mb-2"
                   style={{ fontFamily: "Luben Regular" }}
+=======
+                  className="text-lg font-heading font-semibold text-slate-900 mb-2"
+>>>>>>> origin
                 >
                   {step.title}
                 </h3>
@@ -564,9 +587,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="max-w-5xl mx-auto">
           <div className="clay-card rounded-2xl p-10 sm:p-14">
             <div className="text-center mb-12">
+<<<<<<< HEAD
               <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
                 style={{ fontFamily: "Luben Regular" }}
-              >  
+              >
+=======
+              <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900">
+>>>>>>> origin
                 Built for speed and scale
               </h2>
               <p className="mt-3 text-slate-500 max-w-lg mx-auto">
@@ -595,11 +622,15 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* CTA */}
       <section className="py-24 px-6 bg-slate-900">
         <div className="max-w-3xl mx-auto text-center">
+<<<<<<< HEAD
           <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white"
             style={{ fontFamily: "Luben Regular" }}
+=======
+          <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-white"
+>>>>>>> origin
           >
             Stop searching. Start selling.
-            
+
           </h2>
           <p className="mt-4 text-gray-400 text-lg max-w-xl mx-auto">
             Stick is your AI sales team — it discovers, researches, matches,
@@ -639,7 +670,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            Built at HackEurope 2025. Powered by Claude, LinkUp, Stripe &amp; ElevenLabs.
+            Built at HackEurope 2025. Powered by Anthropic, LinkUp, Stripe &amp; Paid.ai.
           </p>
         </div>
       </footer>

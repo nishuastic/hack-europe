@@ -8,7 +8,7 @@ from sqlmodel import select
 from backend.db import async_session
 from backend.enrichment.agents.data_extractor import ExtractionResult, extract_lead_data
 from backend.enrichment.agents.search_executor import execute_single_enrichment_search
-from backend.models import EnrichmentStatus, Lead
+from backend.models import EnrichmentStatus, GenerationRun, ICPProfile, ICPResearchStatus, Lead
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 BROADCAST_FIELDS = [
     "description", "industry", "funding", "revenue", "employees",
     "contacts", "customers", "company_fit", "buying_signals",
+    "icp_fit_score", "icp_fit_reasoning",
 ]
 
 # Important fields that justify a follow-up round if missing
@@ -51,6 +52,47 @@ async def enrich_lead(lead_id: int, ws_manager) -> None:  # noqa: C901
             "lead_id": lead_id,
             "company_name": lead.company_name,
         })
+
+        # Load ICP context if available for this lead's products
+        icp_context: str | None = None
+        if lead.generation_run_id:
+            gen_run = (
+                await session.execute(
+                    select(GenerationRun).where(GenerationRun.id == lead.generation_run_id)
+                )
+            ).scalar_one_or_none()
+            if gen_run and gen_run.product_ids:
+                for pid in gen_run.product_ids:
+                    icp = (
+                        await session.execute(
+                            select(ICPProfile).where(
+                                ICPProfile.product_id == pid,
+                                ICPProfile.status == ICPResearchStatus.COMPLETE,
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    if icp:
+                        parts = []
+                        if icp.icp_summary:
+                            parts.append(f"Summary: {icp.icp_summary}")
+                        if icp.target_industries:
+                            parts.append(f"Target Industries: {', '.join(icp.target_industries)}")
+                        if icp.employee_range_min or icp.employee_range_max:
+                            emp_min = icp.employee_range_min or "?"
+                            emp_max = icp.employee_range_max or "?"
+                            parts.append(f"Employee Range: {emp_min} - {emp_max}")
+                        if icp.revenue_range:
+                            parts.append(f"Revenue Range: {icp.revenue_range}")
+                        if icp.funding_stages:
+                            parts.append(f"Funding Stages: {', '.join(icp.funding_stages)}")
+                        if icp.geographies:
+                            parts.append(f"Geographies: {', '.join(icp.geographies)}")
+                        if icp.common_traits:
+                            parts.append(f"Common Traits: {', '.join(icp.common_traits)}")
+                        if icp.anti_patterns:
+                            parts.append(f"Anti-Patterns: {', '.join(icp.anti_patterns)}")
+                        icp_context = "\n".join(parts)
+                        break  # Use first available ICP
 
         try:
             existing_data: dict | None = None
@@ -90,6 +132,7 @@ async def enrich_lead(lead_id: int, ws_manager) -> None:  # noqa: C901
                     company_name=lead.company_name,
                     search_results=[search_result],
                     existing_data=existing_data,
+                    icp_context=icp_context,
                 )
 
                 # Save + broadcast extracted fields

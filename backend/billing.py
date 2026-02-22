@@ -31,6 +31,7 @@ CREDIT_COSTS: dict[UsageEventType, int] = {
     UsageEventType.PITCH_DECK: 10,   # 10 SC — 7-slide personalized deck
     UsageEventType.EMAIL: 1,         # 1 SC — personalized outreach email
     UsageEventType.LINKEDIN_OUTREACH: 0,  # Free — warm intro outreach plan
+    UsageEventType.ICP_RESEARCH: 3,      # 3 SC per customer researched for ICP
 }
 
 # ─── Tier plans (monthly subscriptions) ──────────────────────────────

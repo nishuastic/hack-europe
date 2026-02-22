@@ -3,12 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
-import Products from "@/components/Products";
+import Analytics from "@/components/Analytics";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
-import { AppView } from "@/lib/types";
 
-export default function ProductsPage() {
+export default function AnalyticsPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -29,22 +28,21 @@ export default function ProductsPage() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar 
-        view={{ page: "products" }} 
+      <Sidebar
+        view={{ page: "analytics" }}
         setView={(v) => {
           if (v.page === "dashboard") router.push("/dashboard");
+          if (v.page === "products") router.push("/products");
           if (v.page === "billing") router.push("/billing");
-          if (v.page === "onboard") router.push("/?view=onboard");
-        }} 
+          if (v.page === "analytics") router.push("/analytics");
+        }}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-4 sm:p-6 md:p-10 w-full">
-          <Products
-            onEdit={(id) => router.push(`/products/${id}`)}
-          />
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-4 sm:p-6 md:p-8 w-full">
+          <Analytics />
         </div>
       </main>
     </div>

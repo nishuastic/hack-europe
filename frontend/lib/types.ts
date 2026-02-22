@@ -7,4 +7,5 @@ export type AppView =
   | { page: 'lead-detail'; leadId: number }
   | { page: 'pitch-editor'; leadId: number; productId?: number }
   | { page: 'billing' }
+  | { page: 'analytics' }
   | { page: 'linkedin-import' };
