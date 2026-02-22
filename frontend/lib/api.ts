@@ -27,6 +27,7 @@ export interface Product {
   website?: string;
   example_clients?: string[];
   differentiator?: string;
+  current_clients?: { name: string; website: string }[];
 }
 
 export interface Lead {
@@ -45,6 +46,8 @@ export interface Lead {
   pitch_deck_generated?: boolean;
   email_generated?: boolean;
   voice_generated?: boolean;
+  icp_fit_score?: number | null;
+  icp_fit_reasoning?: string | null;
 }
 
 export interface Contact {
@@ -60,6 +63,25 @@ export interface BuyingSignal {
   strength: "strong" | "moderate" | "weak";
 }
 
+export type ProductSnapshot = Product;
+
+export interface ICPProfile {
+  id: number;
+  product_id: number;
+  status: string;
+  target_industries?: string[] | null;
+  employee_range_min?: number | null;
+  employee_range_max?: number | null;
+  revenue_range?: string | null;
+  funding_stages?: string[] | null;
+  geographies?: string[] | null;
+  common_traits?: string[] | null;
+  anti_patterns?: string[] | null;
+  icp_summary?: string | null;
+  customers_researched: number;
+  created_at: string;
+}
+
 export interface GenerationRun {
   id: number;
   created_at: string;
@@ -68,6 +90,7 @@ export interface GenerationRun {
   product_names: string[];
   lead_count: number;
   max_companies: number;
+  product_snapshots?: ProductSnapshot[];
 }
 
 export interface ProductMatch {
@@ -86,6 +109,23 @@ export interface PitchSlide {
   title: string;
   body_html: string;
   speaker_notes: string;
+}
+
+export interface AnalyticsOpportunity {
+  company_name: string;
+  product_name: string;
+  match_score: number;
+  conversion_likelihood: string | null;
+}
+
+export interface AnalyticsData {
+  total_leads: number;
+  enriched_count: number;
+  industry_breakdown: Record<string, number>;
+  score_distribution: Record<string, number>;
+  avg_match_score_by_product: Record<string, number>;
+  signal_frequency: Record<string, number>;
+  top_opportunities: AnalyticsOpportunity[];
 }
 
 export type WebSocketMessageHandler = (msg: WSMessage) => void;
@@ -115,7 +155,16 @@ export type WSMessage =
       match_score: number;
       match_reasoning: string;
       product_name: string;
-    };
+    }
+  | { type: "linkedin_import_start"; total_connections: number; total_leads: number }
+  | { type: "linkedin_match_found"; connection_name: string; company_name: string; confidence: string }
+  | { type: "linkedin_outreach_generated"; connection_name: string; company_name: string }
+  | { type: "linkedin_import_complete"; total_matches: number; total_outreach_plans: number }
+  | { type: "linkedin_import_error"; error: string }
+  | { type: "discovery_start"; max_companies: number; product_count: number }
+  | { type: "discovery_thinking"; iteration: number; detail: string }
+  | { type: "discovery_complete" }
+  | { type: "company_discovered"; company_name: string; why_good_fit?: string };
 
 class ApiClient {
   private ws: WebSocket | null = null;
@@ -486,7 +535,7 @@ class ApiClient {
     return data.checkout_url;
   }
 
-  async getAnalytics(): Promise<unknown> {
+  async getAnalytics(): Promise<AnalyticsData> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/analytics`);
     return res.json();
   }
@@ -532,6 +581,78 @@ class ApiClient {
     if (!res.ok) throw new Error("Failed to start discovery");
     return res.json();
   }
+
+  async getLinkedInMatches(leadId?: number): Promise<LinkedInMatch[]> {
+    const params = leadId ? `?lead_id=${leadId}` : "";
+    const res = await this.fetchWithAuth(`${API_BASE}/api/linkedin/matches${params}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.matches;
+  }
+
+  async uploadLinkedInArchive(file: File): Promise<void> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await this.fetchWithAuth(`${API_BASE}/api/linkedin/import`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Upload failed" }));
+      throw new Error(err.detail || "Upload failed");
+    }
+  }
+
+  async importLinkedInDemo(): Promise<void> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/linkedin/demo`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Demo import failed" }));
+      throw new Error(err.detail || "Demo import failed");
+    }
+  }
+
+  async clearLinkedInConnections(): Promise<void> {
+    await this.fetchWithAuth(`${API_BASE}/api/linkedin/connections`, {
+      method: "DELETE",
+    });
+  }
+
+  async getICPProfile(productId: number): Promise<ICPProfile | { status: string }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products/${productId}/icp`);
+    return res.json();
+  }
+
+  async learnICP(productId: number): Promise<void> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products/${productId}/learn-icp`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "ICP learning failed" }));
+      throw new Error(err.detail || "ICP learning failed");
+    }
+  }
+}
+
+export interface LinkedInOutreachPlan {
+  intro_message: string;
+  talking_points: string[];
+  context: string;
+  timing_suggestion: string;
+}
+
+export interface LinkedInMatch {
+  id: number;
+  connection_id: number;
+  lead_id: number;
+  match_confidence: string;
+  status: string;
+  outreach_plan: LinkedInOutreachPlan | null;
+  connection_name: string;
+  connection_position: string | null;
+  connection_company: string | null;
+  lead_company_name: string;
 }
 
 export const api = new ApiClient();

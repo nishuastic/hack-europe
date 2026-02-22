@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, GenerationRun, Product, ProductSnapshot, WSMessage } from "@/lib/api";
+import { api, GenerationRun, Product, WSMessage } from "@/lib/api";
 
 interface DashboardProps {
   onSelectRun: (id: number) => void;

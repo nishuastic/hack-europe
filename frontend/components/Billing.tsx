@@ -25,6 +25,7 @@ interface BillingData {
   costs: Record<string, number>;
   tiers: Record<string, TierPlan>;
   payg_packs: Record<string, PaygPack>;
+  subscription?: { active_tier: string | null; status: string | null };
 }
 
 const USAGE_COSTS = [

@@ -129,11 +129,11 @@ async def ensure_customer(user_id: int, email: str, session: AsyncSession) -> Us
             if "DUPLICATE_EXTERNAL_ID" in str(exc):
                 logger.info("Paid.ai customer exists for user %d, fetching", user_id)
                 try:
-                    existing = paid_client.customers.list_customers(
-                        external_id=str(user_id),
+                    existing = paid_client.customers.get_customer_by_external_id(
+                        str(user_id),
                     )
-                    if existing and existing.data:
-                        credits.paid_customer_id = existing.data[0].id
+                    if existing:
+                        credits.paid_customer_id = existing.id
                         session.add(credits)
                         await session.commit()
                         await session.refresh(credits)
