@@ -12,6 +12,24 @@ from backend.discovery.icp_agent import run_discovery_agent
 from backend.enrichment.pipeline import enrich_leads
 from backend.models import CompanyProfile, EnrichmentStatus, GenerationRun, Lead, Product, UsageEventType
 
+
+async def _enrich_then_match(lead_ids: list[int], ws_manager, user_id: int) -> None:
+    """Run enrichment for leads, then auto-trigger product matching."""
+    await enrich_leads(lead_ids, ws_manager)
+    async with async_session() as credit_session:
+        has_credits = await check_credits(user_id, UsageEventType.MATCHING, credit_session)
+        if has_credits:
+            await deduct_credits(user_id, UsageEventType.MATCHING, credit_session)
+            from backend.matching.pipeline import generate_all_matches
+            logger.info(f"Auto-matching leads for user {user_id} after enrichment")
+            await generate_all_matches(ws_manager, user_id)
+        else:
+            logger.warning(f"Insufficient credits to auto-match for user {user_id} — skipping matching")
+            await ws_manager.broadcast({
+                "type": "matching_skipped",
+                "reason": "insufficient_credits",
+            })
+
 logger = logging.getLogger(__name__)
 
 
@@ -162,7 +180,7 @@ async def run_discovery(
                     )
                     sc_used = len(lead_ids) * CREDIT_COSTS[UsageEventType.ENRICHMENT]
                     logger.info(f"Auto-enriching {len(lead_ids)} discovered leads (deducted {sc_used} SC)")
-                    asyncio.create_task(enrich_leads(lead_ids, ws_manager))
+                    asyncio.create_task(_enrich_then_match(lead_ids, ws_manager, user_id))
                 else:
                     logger.warning(f"Insufficient credits to auto-enrich {len(lead_ids)} leads — skipping enrichment")
                     await ws_manager.broadcast({

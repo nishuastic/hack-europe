@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlmodel import JSON, Column, Field, SQLModel
 
 
@@ -202,6 +202,20 @@ class Lead(SQLModel, table=True):
     pitch_deck_generated: bool = False
     email_generated: bool = False
 
+    @field_validator("contacts", mode="before")
+    @classmethod
+    def coerce_contacts(cls, v: object) -> object:
+        if isinstance(v, list):
+            return [Contact(**item) if isinstance(item, dict) else item for item in v]
+        return v
+
+    @field_validator("buying_signals", mode="before")
+    @classmethod
+    def coerce_buying_signals(cls, v: object) -> object:
+        if isinstance(v, list):
+            return [BuyingSignal(**item) if isinstance(item, dict) else item for item in v]
+        return v
+
 
 class Product(SQLModel, table=True):
     """A product in the user's catalog — matched against leads by AI."""
@@ -248,6 +262,13 @@ class PitchDeck(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
     slides: list[PitchSlide] = Field(sa_column=Column(JSON))
     pptx_path: Optional[str] = None  # Path to generated PPTX file
+
+    @field_validator("slides", mode="before")
+    @classmethod
+    def coerce_slides(cls, v: object) -> list[PitchSlide]:
+        if isinstance(v, list):
+            return [PitchSlide(**item) if isinstance(item, dict) else item for item in v]
+        return v  # type: ignore[return-value]
 
 
 class GeneratedEmail(SQLModel, table=True):

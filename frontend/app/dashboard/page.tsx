@@ -47,7 +47,7 @@ export default function DashboardPage() {
         <Header contentRef={contentRef} />
         <div ref={contentRef} className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-8 w-full">
           <Dashboard
-            onSelectRun={(id) => router.push(`/run/${id}`)}
+            onSelectRun={(id) => router.push(`/app#generation-run-detail/${id}`)}
           />
         </div>
       </main>

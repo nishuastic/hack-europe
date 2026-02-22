@@ -50,6 +50,7 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
   const [enriching, setEnriching] = useState(false);
   const [generatingDeck, setGeneratingDeck] = useState(false);
   const [generatingEmail, setGeneratingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [emailContent, setEmailContent] = useState<{
     subject: string;
     body: string;
@@ -139,9 +140,14 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
 
   const handleGenerateEmail = async () => {
     setGeneratingEmail(true);
+    setEmailError(null);
     try {
       const matches = await api.getMatches(leadId);
-      const productId = matches.length > 0 ? matches[0].product_id : 1;
+      const productId = matches.length > 0 ? matches[0].product_id : undefined;
+      if (!productId) {
+        setEmailError("No product match found. Wait for matching to complete or run it manually.");
+        return;
+      }
       const result = await api.generateEmail(leadId, productId);
       setEmailContent(result);
       setEmailVersions((prev) => [{ ...result, id: Date.now(), created_at: new Date().toISOString() }, ...prev]);
@@ -150,6 +156,7 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
       setLead(updated);
     } catch (err) {
       console.error("Email generation failed:", err);
+      setEmailError("Email generation failed. Please try again.");
     } finally {
       setGeneratingEmail(false);
     }
@@ -386,6 +393,11 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
                   <span className="flex items-center gap-2">
                     <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
                     Generating email...
+                  </span>
+                ) : emailError ? (
+                  <span className="flex items-center gap-2 text-amber-600">
+                    <span className="material-symbols-outlined text-[18px]">warning</span>
+                    {emailError}
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
