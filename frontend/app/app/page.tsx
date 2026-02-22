@@ -108,8 +108,8 @@ export default function AppPage() {
             <LeadDetail
               leadId={view.leadId}
               onBack={() => goTo({ page: "dashboard" })}
-              onOpenPitchEditor={() =>
-                goTo({ page: "pitch-editor", leadId: view.leadId })
+              onOpenPitchEditor={(productId) =>
+                goTo({ page: "pitch-editor", leadId: view.leadId, productId })
               }
             />
           )}

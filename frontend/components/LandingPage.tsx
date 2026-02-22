@@ -362,24 +362,6 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* Logos / social proof */}
       <section className="py-12 border-y border-slate-200 bg-white">
         <div className="max-w-5xl mx-auto px-6 text-center">
-<<<<<<< HEAD
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6">
-            Built with leading AI and data infrastructure
-          </p>
-          <div className="flex items-center justify-center gap-10 sm:gap-16 flex-wrap opacity-40">
-            <span className="text-lg font-bold text-gray-900 tracking-tight">
-              Claude
-            </span>
-            <span className="text-lg font-bold text-gray-900 tracking-tight">
-              LinkUp
-            </span>
-            <span className="text-lg font-bold text-gray-900 tracking-tight">
-              Stripe
-            </span>
-            <span className="text-lg font-bold text-gray- tracking-tight">
-              ElevenLabs
-            </span>
-=======
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-8">
             Built with leading AI and data infrastructure
           </p>
@@ -388,7 +370,6 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <img src="/logos/linkup.png" alt="LinkUp" className="h-7 opacity-50 hover:opacity-80 transition-opacity" />
             <img src="/logos/stripe.svg" alt="Stripe" className="h-8 opacity-50 hover:opacity-80 transition-opacity" />
             <img src="/logos/paidai.png" alt="Paid.ai" className="h-7 opacity-50 hover:opacity-80 transition-opacity" />
->>>>>>> origin
           </div>
         </div>
       </section>
@@ -405,20 +386,11 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-<<<<<<< HEAD
-            <p className="text-xs font-semibold text-black larayck-500uppercase tracking-widest mb-3">
-              Features
-            </p>
-            <h2
-              className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
-              style={{ fontFamily: "Luben Regular" }}
-=======
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
               Features
             </p>
             <h2
               className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900"
->>>>>>> origin
             >
               {typedText.split("\n").map((line, i) => (
                 <span key={i}>
@@ -512,12 +484,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               How it works
             </p>
             <h2
-<<<<<<< HEAD
-              className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
-              style={{ fontFamily: "Luben Regular" }}
-=======
               className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900"
->>>>>>> origin
             >
               Three steps to your first pitch
             </h2>
@@ -564,12 +531,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                   </span>
                 </div>
                 <h3
-<<<<<<< HEAD
-                  className="text-lg font-semibold text-slate-900 mb-2"
-                  style={{ fontFamily: "Luben Regular" }}
-=======
                   className="text-lg font-heading font-semibold text-slate-900 mb-2"
->>>>>>> origin
                 >
                   {step.title}
                 </h3>
@@ -587,13 +549,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="max-w-5xl mx-auto">
           <div className="clay-card rounded-2xl p-10 sm:p-14">
             <div className="text-center mb-12">
-<<<<<<< HEAD
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
-                style={{ fontFamily: "Luben Regular" }}
-              >
-=======
               <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900">
->>>>>>> origin
                 Built for speed and scale
               </h2>
               <p className="mt-3 text-slate-500 max-w-lg mx-auto">
@@ -622,12 +578,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* CTA */}
       <section className="py-24 px-6 bg-slate-900">
         <div className="max-w-3xl mx-auto text-center">
-<<<<<<< HEAD
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white"
-            style={{ fontFamily: "Luben Regular" }}
-=======
           <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-white"
->>>>>>> origin
           >
             Stop searching. Start selling.
 
