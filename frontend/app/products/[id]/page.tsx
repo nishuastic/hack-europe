@@ -31,8 +31,8 @@ export default function ProductEditPage() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar 
-        view={{ page: "products" }} 
+      <Sidebar
+        view={{ page: "products" }}
         setView={(v) => {
           if (v.page === "dashboard") router.push("/dashboard");
           if (v.page === "products") router.push("/products");
@@ -40,9 +40,10 @@ export default function ProductEditPage() {
           if (v.page === "analytics") router.push("/analytics");
           if (v.page === "linkedin-import") router.push("/app");
           if (v.page === "onboard") router.push("/?view=onboard");
-        }} 
+        }}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onProfileClick={() => router.push("/setup")}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />

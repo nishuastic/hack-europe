@@ -95,7 +95,7 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
   const topScore = data.top_icp_score != null ? `${data.top_icp_score}/100` : "-";
 
   return (
-    <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
+    <div className="max-w-[1400px] mx-auto w-full flex flex-col gap-8 pb-10">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Analytics</h1>
@@ -163,9 +163,5 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
 }
 
 export default function Analytics({ onSelectLead }: { onSelectLead?: (leadId: number) => void } = {}) {
-  return (
-    <div className="min-h-full">
-      <AnalyticsContent onSelectLead={onSelectLead} />
-    </div>
-  );
+  return <AnalyticsContent onSelectLead={onSelectLead} />;
 }

@@ -180,7 +180,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
           <h1
             ref={heroRef.ref}
-            className={`text-5xl sm:text-6xl lg:text-7xl font-heading font-bold tracking-tight text-slate-900 leading-[1.08] transition-all duration-1000 transform ${
+            className={`text-5xl sm:text-6xl lg:text-7xl font-display font-bold tracking-tight text-slate-900 leading-[1.08] transition-all duration-1000 transform ${
               heroRef.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
             }`}
           >
@@ -191,7 +191,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             client prospects
           </h1>
 
-          <p className="mt-6 text-lg sm:text-xl font-heading text-slate-500 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-6 text-lg sm:text-xl font-display text-slate-500 max-w-2xl mx-auto leading-relaxed">
             Add your products, discover target companies, and get AI-generated
             pitch decks and outreach — all matched to the right buyer, automatically.
           </p>
@@ -390,7 +390,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               Features
             </p>
             <h2
-              className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900"
+              className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900"
             >
               {typedText.split("\n").map((line, i) => (
                 <span key={i}>
@@ -484,7 +484,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               How it works
             </p>
             <h2
-              className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900"
+              className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900"
             >
               Three steps to your first pitch
             </h2>
@@ -531,7 +531,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                   </span>
                 </div>
                 <h3
-                  className="text-lg font-heading font-semibold text-slate-900 mb-2"
+                  className="text-lg font-display font-semibold text-slate-900 mb-2"
                 >
                   {step.title}
                 </h3>
@@ -549,7 +549,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="max-w-5xl mx-auto">
           <div className="clay-card rounded-2xl p-10 sm:p-14">
             <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900">
+              <h2 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-slate-900">
                 Built for speed and scale
               </h2>
               <p className="mt-3 text-slate-500 max-w-lg mx-auto">
@@ -578,7 +578,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* CTA */}
       <section className="py-24 px-6 bg-slate-900">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-white"
+          <h2 className="text-3xl sm:text-4xl font-display font-bold tracking-tight text-white"
           >
             Stop searching. Start selling.
 

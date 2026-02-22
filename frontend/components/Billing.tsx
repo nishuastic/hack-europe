@@ -73,8 +73,8 @@ export default function Billing() {
   const packs = billingData?.payg_packs || {};
 
   return (
-    <div className="max-w-5xl mx-auto pb-12">
-      <div className="mb-8">
+    <div className="max-w-[1400px] mx-auto w-full flex flex-col gap-8 pb-10">
+      <div>
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
           Billing & Credits
         </h1>
@@ -84,7 +84,7 @@ export default function Billing() {
       </div>
 
       {/* Current Balance */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-slate-500">Available Credits</p>
@@ -101,7 +101,7 @@ export default function Billing() {
       </div>
 
       {/* Usage Costs */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-8">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Usage Costs</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {USAGE_COSTS.map((usage) => (

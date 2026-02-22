@@ -11,8 +11,7 @@ module.exports = {
         accent: "#2563eb",
       },
       fontFamily: {
-        display: ["Inter", "sans-serif"],
-        heading: ["Manrope", "Inter", "sans-serif"],
+        display: ["Inter", "system-ui", "sans-serif"],
       },
       boxShadow: {
         soft: "0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 4px 16px -4px rgba(0, 0, 0, 0.02)",

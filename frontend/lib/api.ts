@@ -314,6 +314,7 @@ class ApiClient {
     }
   }
 
+
   connectWebSocket() {
     if (this.ws?.readyState === WebSocket.OPEN) return;
 
