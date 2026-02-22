@@ -278,14 +278,11 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
             </section>
           )}
 
-          {/* Email */}
+           {/* Email */}
           <div className="space-y-4 pb-8">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                <span className="material-symbols-outlined text-base">
-                  mail
-                </span>{" "}
-                Generated Email
+                <span className="material-symbols-outlined text-base">mail</span> Generated Email
               </label>
               <div className="flex items-center gap-3">
                 <button
@@ -293,81 +290,59 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
                   disabled={generatingEmail}
                   className="flex items-center gap-1.5 text-[11px] font-bold text-blue-600 hover:text-blue-800 transition-colors disabled:opacity-50"
                 >
-                  {generatingEmail && (
-                    <span className="material-symbols-outlined text-[14px] animate-spin">
-                      progress_activity
-                    </span>
-                  )}
-                  {generatingEmail ? "GENERATING..." : "GENERATE"}
+                  GENERATE
                 </button>
-                <button
-                  onClick={() => {
-                    const text = emailContent
-                      ? `Subject: ${emailContent.subject}\n\n${emailContent.body}`
-                      : "";
-                    navigator.clipboard.writeText(text);
-                  }}
-                  className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 hover:text-slate-600 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[16px]">
-                    content_copy
-                  </span>{" "}
-                  COPY
-                </button>
+                {emailContent && (
+                  <button
+                    onClick={() => navigator.clipboard.writeText(`Subject: ${emailContent.subject}\n\n${emailContent.body}`)}
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-slate-900 hover:text-slate-600 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">content_copy</span> COPY
+                  </button>
+                )}
               </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col min-h-[300px]">
-              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 space-y-1.5">
-                {emailContent?.contact_name && emailContent.contact_name !== "there" && (
+
+            {emailContent ? (
+              <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 space-y-1.5">
+                  {emailContent.contact_name && emailContent.contact_name !== "there" && (
+                    <div className="flex gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase w-12">To:</span>
+                      <span className="text-xs font-medium">
+                        {emailContent.contact_name}
+                        {emailContent.contact_role && emailContent.contact_role !== "Decision Maker" && (
+                          <span className="text-slate-400 ml-1">({emailContent.contact_role})</span>
+                        )}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex gap-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase w-12">To:</span>
-                    <span className="text-xs font-medium">
-                      {emailContent.contact_name}
-                      {emailContent.contact_role && emailContent.contact_role !== "Decision Maker" && (
-                        <span className="text-slate-400 ml-1">({emailContent.contact_role})</span>
-                      )}
-                    </span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase w-12">Subject:</span>
+                    <span className="text-xs font-medium">{emailContent.subject}</span>
                   </div>
-                )}
-                <div className="flex gap-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase w-12">
-                    Subject:
-                  </span>
-                  <span className="text-xs font-medium">
-                    {emailContent?.subject ||
-                      `Accelerating ${lead.company_name}'s Q4 Growth`}
-                  </span>
+                </div>
+                <div className="p-6 text-sm text-slate-700 leading-relaxed font-light space-y-4">
+                  {emailContent.body.split("\n\n").map((para, i) => <p key={i}>{para}</p>)}
                 </div>
               </div>
-              <div className="flex-1 p-6 text-sm text-slate-700 leading-relaxed font-light space-y-4">
-                {emailContent ? (
-                  emailContent.body
-                    .split("\n\n")
-                    .map((para, i) => <p key={i}>{para}</p>)
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-lg flex items-center justify-center min-h-[160px] text-slate-400 text-sm">
+                {generatingEmail ? (
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                    Generating email...
+                  </span>
                 ) : (
-                  <>
-                    <p>
-                      Hi {lead.contacts?.[0]?.name?.split(" ")[0] || "there"},
-                    </p>
-                    <p>
-                      I noticed {lead.company_name}&apos;s recent{" "}
-                      {lead.funding ? "funding round" : "growth"} and the focus
-                      on scaling your{" "}
-                      {lead.industry?.toLowerCase() || "operations"}.
-                    </p>
-                    <p>
-                      Would you be open to a 15-minute chat next Tuesday?
-                    </p>
-                    <p>
-                      Best,
-                      <br />
-                      Alex
-                    </p>
-                  </>
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px]">mail</span>
+                    Click Generate to create a personalised email
+                  </span>
                 )}
               </div>
-            </div>
+            )}
           </div>
+
         </div>
       </div>
     </div>
