@@ -35,7 +35,10 @@ export default function ProductEditPage() {
         view={{ page: "products" }} 
         setView={(v) => {
           if (v.page === "dashboard") router.push("/dashboard");
+          if (v.page === "products") router.push("/products");
           if (v.page === "billing") router.push("/billing");
+          if (v.page === "analytics") router.push("/analytics");
+          if (v.page === "linkedin-import") router.push("/app");
           if (v.page === "onboard") router.push("/?view=onboard");
         }} 
         collapsed={sidebarCollapsed}
@@ -43,7 +46,7 @@ export default function ProductEditPage() {
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-4 sm:p-6 md:p-10 w-full">
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-10 w-full">
           <ProductEdit
             productId={productId}
             onBack={() => router.push("/products")}
