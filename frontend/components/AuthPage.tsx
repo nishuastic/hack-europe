@@ -38,7 +38,7 @@ export default function AuthPage({ mode, onSwitchMode }: AuthPageProps) {
     <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa] px-4">
       <div className="w-full max-w-md mx-auto">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 mb-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 mb-1">
             <span
               className="w-12 h-12 bg-black"
               style={{
@@ -48,7 +48,7 @@ export default function AuthPage({ mode, onSwitchMode }: AuthPageProps) {
               aria-label="Stick logo"
             />
           </div>
-          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight" style={{ fontFamily: "'Playfair Display', serif" }}>
             Stick
           </h1>
           <p className="text-slate-500 mt-2 text-sm">

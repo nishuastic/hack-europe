@@ -27,7 +27,7 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
   return (
     <aside className={`hidden md:flex flex-col bg-white border-r border-slate-200/60 z-20 shrink-0 h-screen transition-all duration-300 ease-in-out ${collapsed ? 'w-[60px]' : 'w-52'}`}>
       {/* Logo & Toggle */}
-      <div className={`py-5 flex items-center shrink-0 overflow-visible ${collapsed ? 'flex-col gap-1 px-0' : 'px-3 gap-2'}`}>
+      <div className={`py-5 flex items-center shrink-0 overflow-visible ${collapsed ? 'flex-col gap-1 px-0' : 'px-3 gap-1'}`}>
         {collapsed ? (
           /* Collapsed: show chevron button to expand */
           <button
@@ -52,7 +52,7 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
                 aria-label="Stick logo"
               />
             </div>
-            <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-900 flex-1 min-w-0">
+            <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-900 flex-1 min-w-0" style={{ fontFamily: "'Playfair Display', serif" }}>
               Stick
             </h2>
             {onToggle && (
