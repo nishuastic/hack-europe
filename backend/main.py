@@ -213,6 +213,7 @@ class ProductCreate(BaseModel):
     company_name: str | None = None
     website: str | None = None
     example_clients: list[str] | None = None
+    current_clients: list[dict] | None = None
     differentiator: str | None = None
 
 
@@ -228,6 +229,7 @@ class ProductUpdate(BaseModel):
     company_name: str | None = None
     website: str | None = None
     example_clients: list[str] | None = None
+    current_clients: list[dict] | None = None
     differentiator: str | None = None
 
 

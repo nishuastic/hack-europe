@@ -162,6 +162,9 @@ class Product(SQLModel, table=True):
     company_name: Optional[str] = None  # The selling company's name
     website: Optional[str] = None  # Seller's website
     example_clients: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))  # Reference clients
+    current_clients: Optional[list[dict]] = Field(
+        default=None, sa_column=Column(JSON)
+    )  # [{"name": "Client", "website": "https://..."}]
     differentiator: Optional[str] = None  # What makes it special / USP
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -201,7 +204,6 @@ class GeneratedEmail(SQLModel, table=True):
     contact_role: str
     subject: str
     body: str
-
 
 
 class PitchHistory(SQLModel, table=True):
