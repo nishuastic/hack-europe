@@ -76,7 +76,7 @@ export default function LinkedInImport() {
         setPhase("upload");
       }
     });
-    return unsub;
+    return () => { unsub(); };
   }, [addEvent]);
 
   // Check for existing data on mount

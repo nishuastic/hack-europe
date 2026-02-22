@@ -26,6 +26,7 @@ export interface Product {
   company_name?: string;
   website?: string;
   example_clients?: string[];
+  current_clients?: { name: string; website: string }[];
   differentiator?: string;
 }
 
@@ -40,6 +41,7 @@ export interface Lead {
   employees?: number;
   contacts?: Contact[];
   customers?: string[];
+  company_fit?: string;
   buying_signals?: BuyingSignal[];
   enrichment_status: string;
   pitch_deck_generated?: boolean;
@@ -86,6 +88,7 @@ export interface ProductSnapshot {
   company_name: string | null;
   website: string | null;
   example_clients: string[] | null;
+  current_clients: { name: string; website: string }[] | null;
   differentiator: string | null;
 }
 
@@ -461,19 +464,34 @@ class ApiClient {
     return data.matches;
   }
 
-  async generatePitchDeck(leadId: number, productId: number): Promise<void> {
-    await this.fetchWithAuth(
+  async generatePitchDeck(
+    leadId: number,
+    productId: number,
+  ): Promise<{
+    pitch_deck_id: number;
+    slides: { slide_number: number; title: string; body_html: string; speaker_notes: string }[];
+    pptx_path: string;
+  }> {
+    const res = await this.fetchWithAuth(
       `${API_BASE}/api/leads/${leadId}/pitch-deck?product_id=${productId}`,
       { method: "POST" },
     );
+    return res.json();
   }
 
-  async getPitchDeck(leadId: number, productId?: number): Promise<string> {
+  async getPitchDeck(
+    leadId: number,
+    productId?: number,
+  ): Promise<{
+    id: number;
+    slides: { slide_number: number; title: string; body_html: string; speaker_notes: string }[];
+    pptx_path: string | null;
+  }> {
     const params = productId ? `?product_id=${productId}` : "";
     const res = await this.fetchWithAuth(
       `${API_BASE}/api/leads/${leadId}/pitch-deck${params}`,
     );
-    return res.text();
+    return res.json();
   }
 
   async downloadPitchDeck(leadId: number, productId?: number): Promise<Blob> {
@@ -487,7 +505,7 @@ class ApiClient {
   async generateEmail(
     leadId: number,
     productId: number,
-  ): Promise<{ subject: string; body: string }> {
+  ): Promise<{ subject: string; body: string; contact_name: string; contact_role: string }> {
     const res = await this.fetchWithAuth(
       `${API_BASE}/api/leads/${leadId}/email?product_id=${productId}`,
       { method: "POST" },

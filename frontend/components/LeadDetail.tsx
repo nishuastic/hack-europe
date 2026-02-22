@@ -6,7 +6,7 @@ import { api, Lead } from '@/lib/api';
 interface LeadDetailProps {
   leadId: number;
   onBack: () => void;
-  onOpenPitchEditor: () => void;
+  onOpenPitchEditor: (productId?: number) => void;
 }
 
 function signalBadge(strength: string) {
@@ -53,6 +53,8 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
   const [emailContent, setEmailContent] = useState<{
     subject: string;
     body: string;
+    contact_name: string;
+    contact_role: string;
   } | null>(null);
 
   useEffect(() => {
@@ -94,12 +96,14 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
   };
 
   const handleGenerateDeck = async () => {
-    if (!lead?.best_match_product) return;
     setGeneratingDeck(true);
     try {
-      // Use product_id 1 as default — in a full impl we'd look up the matched product
       const matches = await api.getMatches(leadId);
-      const productId = matches.length > 0 ? matches[0].product_id : 1;
+      const productId = matches.length > 0 ? matches[0].product_id : undefined;
+      if (!productId) {
+        console.error("No matched product found for pitch deck generation");
+        return;
+      }
       await api.generatePitchDeck(leadId, productId);
       const updated = await api.getLead(leadId);
       setLead(updated);
@@ -186,7 +190,15 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
               </button>
             )}
             <button
-              onClick={onOpenPitchEditor}
+              onClick={async () => {
+                try {
+                  const matches = await api.getMatches(leadId);
+                  const productId = matches.length > 0 ? matches[0].product_id : undefined;
+                  onOpenPitchEditor(productId);
+                } catch {
+                  onOpenPitchEditor();
+                }
+              }}
               className="bg-slate-900 text-white px-5 py-2 rounded text-sm font-semibold shadow-sm hover:bg-slate-800 transition-colors flex items-center gap-2"
             >
               <span className="material-symbols-outlined text-[18px]">slideshow</span>
@@ -305,8 +317,19 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
               </div>
             </div>
             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col min-h-[300px]">
-              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-                <div className="flex gap-2 mb-2">
+              <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 space-y-1.5">
+                {emailContent?.contact_name && emailContent.contact_name !== "there" && (
+                  <div className="flex gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase w-12">To:</span>
+                    <span className="text-xs font-medium">
+                      {emailContent.contact_name}
+                      {emailContent.contact_role && emailContent.contact_role !== "Decision Maker" && (
+                        <span className="text-slate-400 ml-1">({emailContent.contact_role})</span>
+                      )}
+                    </span>
+                  </div>
+                )}
+                <div className="flex gap-2">
                   <span className="text-[10px] font-bold text-slate-400 uppercase w-12">
                     Subject:
                   </span>
