@@ -38,10 +38,15 @@ export default function AuthPage({ mode, onSwitchMode }: AuthPageProps) {
     <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa] px-4">
       <div className="w-full max-w-md mx-auto">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-slate-900 mb-4">
-            <span className="material-symbols-outlined text-3xl text-white">
-              auto_awesome
-            </span>
+          <div className="inline-flex items-center justify-center w-14 h-14 mb-4">
+            <span
+              className="w-12 h-12 bg-black"
+              style={{
+                WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
+                mask: "url('/stick_2.svg') center / contain no-repeat",
+              }}
+              aria-label="Stick logo"
+            />
           </div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
             Stick
