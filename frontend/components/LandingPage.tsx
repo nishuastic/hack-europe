@@ -299,7 +299,10 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <div className="w-15 h-15 rounded-lg flex items-center justify-center">
               <span className="w-14 h-14 bg-amber-800" style={{ WebkitMask: "url('/stick_2.svg') center / contain no-repeat", mask: "url('/stick_2.svg') center / contain no-repeat" }} aria-label="Stick logo" />
             </div>
-            <span className="text-5xl font-semibold tracking-tight text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>Stick</span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-5xl font-semibold tracking-tight text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>Stick</span>
+              <span className="text-sm font-medium italic text-slate-400" style={{ fontFamily: "'Playfair Display', serif" }}>Let&apos;s fetch them all.</span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <a href="#features" className="hidden sm:block text-sm text-slate-500 hover:text-slate-900 transition-colors px-3 py-1.5">Features</a>
@@ -328,17 +331,17 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
         <div className="max-w-5xl mx-auto mt-16">
           <div className="clay-card rounded-2xl overflow-hidden shadow-xl" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-            <div className="bg-slate-900 px-4 py-2.5 flex items-center gap-2">
+            <div className="bg-white border-b border-slate-200 px-4 py-2.5 flex items-center gap-2">
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-red-400" /><div className="w-3 h-3 rounded-full bg-yellow-400" /><div className="w-3 h-3 rounded-full bg-green-400" />
               </div>
-              <div className="flex-1 text-center"><span className="text-xs text-gray-400 font-medium">app.stick.ai</span></div>
+              <div className="flex-1 text-center"><span className="text-xs text-slate-400 font-medium">app.stick.ai</span></div>
             </div>
             <div className="flex">
-              <div className="hidden sm:flex flex-col items-center gap-1 bg-slate-900 px-2 py-4 border-r border-slate-800 w-12 shrink-0">
+              <div className="hidden sm:flex flex-col items-center gap-1 bg-white px-2 py-4 border-r border-slate-200 w-12 shrink-0">
                 {[{ icon: "dashboard", active: demoView === "table" }, { icon: "inventory_2", active: false }, { icon: "bar_chart", active: false }, { icon: "payments", active: false }].map((item, i) => (
-                  <div key={i} className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.active ? "bg-slate-700" : "hover:bg-slate-800"} transition-colors`}>
-                    <span className={`material-symbols-outlined text-[18px] ${item.active ? "text-white" : "text-slate-500"}`}>{item.icon}</span>
+                  <div key={i} className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.active ? "bg-slate-100" : "hover:bg-slate-50"} transition-colors`}>
+                    <span className={`material-symbols-outlined text-[18px] ${item.active ? "text-slate-900" : "text-slate-400"}`}>{item.icon}</span>
                   </div>
                 ))}
               </div>
@@ -453,7 +456,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
       <section className="py-16 px-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>Stop searching. Start selling.</h2>
+          <h2 className="text-6xl sm:text-8xl font-bold tracking-tight text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>Stop searching. Start selling.</h2>
+          <p className="mt-6 text-3xl sm:text-4xl font-semibold tracking-tight text-slate-700 italic" style={{ fontFamily: "'Playfair Display', serif" }}>Let&apos;s fetch them all.</p>
           <p className="mt-3 text-slate-500 max-w-xl mx-auto">Stick is your AI sales team — it discovers, researches, matches, and pitches. All you have to do is close.</p>
           <button onClick={onGetStarted} className="mt-8 bg-slate-900 text-white text-base font-semibold px-8 py-3.5 rounded-xl hover:bg-slate-800 transition-all shadow-lg inline-flex items-center gap-2">
             Get started for free<span className="material-symbols-outlined text-[20px]">arrow_forward</span>
