@@ -159,6 +159,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             >
               How it works
             </a>
+            <a
+              href="/pricing"
+              className="hidden sm:block text-sm text-slate-500 hover:text-slate-900  px-3 py-1.5"
+              style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
+            >
+              Pricing
+            </a>
             <button
               onClick={onGetStarted}
               className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 transition-all shadow-md"
@@ -613,6 +620,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <nav className="flex items-center gap-6">
               <a href="#features" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Features</a>
               <a href="#how-it-works" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">How it works</a>
+              <a href="/pricing" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Pricing</a>
               <button onClick={onGetStarted} className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Get started</button>
             </nav>
           </div>
