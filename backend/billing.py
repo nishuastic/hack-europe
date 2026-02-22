@@ -26,10 +26,11 @@ stripe.api_key = settings.stripe_api_key
 # ─── Stick Credits — cost per action ─────────────────────────────────
 # Currency: stick_credits (SC). Users buy packs/tiers in EUR, spend SC on actions.
 CREDIT_COSTS: dict[UsageEventType, int] = {
-    UsageEventType.ENRICHMENT: 5,  # 5 SC — deep web research per company
-    UsageEventType.MATCHING: 2,  # 2 SC — AI product-to-lead matching
-    UsageEventType.PITCH_DECK: 10,  # 10 SC — 7-slide personalized deck
-    UsageEventType.EMAIL: 1,  # 1 SC — personalized outreach email
+    UsageEventType.ENRICHMENT: 5,    # 5 SC — deep web research per company
+    UsageEventType.MATCHING: 2,      # 2 SC — AI product-to-lead matching
+    UsageEventType.PITCH_DECK: 10,   # 10 SC — 7-slide personalized deck
+    UsageEventType.EMAIL: 1,         # 1 SC — personalized outreach email
+    UsageEventType.LINKEDIN_OUTREACH: 0,  # Free — warm intro outreach plan
 }
 
 # ─── Tier plans (monthly subscriptions) ──────────────────────────────
@@ -123,8 +124,22 @@ async def ensure_customer(user_id: int, email: str, session: AsyncSession) -> Us
             session.add(credits)
             await session.commit()
             await session.refresh(credits)
-        except Exception:
-            logger.exception("Failed to create Paid.ai customer")
+        except Exception as exc:
+            if "DUPLICATE_EXTERNAL_ID" in str(exc):
+                logger.info("Paid.ai customer exists for user %d, fetching", user_id)
+                try:
+                    existing = paid_client.customers.list_customers(
+                        external_id=str(user_id),
+                    )
+                    if existing and existing.data:
+                        credits.paid_customer_id = existing.data[0].id
+                        session.add(credits)
+                        await session.commit()
+                        await session.refresh(credits)
+                except Exception:
+                    logger.exception("Failed to fetch existing Paid.ai customer")
+            else:
+                logger.exception("Failed to create Paid.ai customer")
 
     return credits
 
@@ -176,6 +191,7 @@ def _emit_signal(event_type: UsageEventType, credits: UserCredits, metadata: dic
         UsageEventType.MATCHING: "matching",
         UsageEventType.PITCH_DECK: "pitch_deck_generation",
         UsageEventType.EMAIL: "email_generation",
+        UsageEventType.LINKEDIN_OUTREACH: "linkedin_outreach",
     }
 
     try:

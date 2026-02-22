@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Fields to broadcast individually for the live "cells filling in" effect
 BROADCAST_FIELDS = [
     "description", "industry", "funding", "revenue", "employees",
-    "contacts", "customers", "buying_signals",
+    "contacts", "customers", "company_fit", "buying_signals",
 ]
 
 # Important fields that justify a follow-up round if missing

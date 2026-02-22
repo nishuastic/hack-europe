@@ -1,11 +1,15 @@
 """Stick data models — SQLModel schemas for leads, enrichments, product matching, and pitch decks."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel
 from sqlmodel import JSON, Column, Field, SQLModel
+
+
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
 
 
 class User(SQLModel, table=True):
@@ -15,7 +19,7 @@ class User(SQLModel, table=True):
     email: str = Field(unique=True, index=True)
     hashed_password: str
     name: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class UserLinkedMixin(SQLModel):
@@ -29,6 +33,7 @@ class UsageEventType(str, Enum):
     MATCHING = "matching"
     PITCH_DECK = "pitch_deck"
     EMAIL = "email"
+    LINKEDIN_OUTREACH = "linkedin_outreach"
 
 
 class UserCredits(SQLModel, table=True):
@@ -51,7 +56,7 @@ class UsageEvent(SQLModel, table=True):
     user_id: int = Field(foreign_key="user.id", index=True)
     event_type: UsageEventType
     credits_used: int
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class EnrichmentStatus(str, Enum):
@@ -89,6 +94,43 @@ class BuyingSignal(BaseModel):
     strength: str  # "strong", "moderate", "weak"
 
 
+class LinkedInMatchStatus(str, Enum):
+    PENDING = "pending"
+    GENERATING = "generating"
+    COMPLETE = "complete"
+    FAILED = "failed"
+
+
+class WarmIntroOutreach(BaseModel):
+    intro_message: str
+    talking_points: list[str]
+    context: str
+    timing_suggestion: str
+
+
+class LinkedInConnection(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    first_name: str
+    last_name: str
+    email: str | None = None
+    company: str | None = None
+    position: str | None = None
+    connected_on: str | None = None
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class LinkedInMatch(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    connection_id: int = Field(foreign_key="linkedinconnection.id")
+    lead_id: int = Field(foreign_key="lead.id")
+    match_confidence: str = "exact"
+    outreach_plan: WarmIntroOutreach | None = Field(default=None, sa_column=Column(JSON))
+    status: LinkedInMatchStatus = LinkedInMatchStatus.PENDING
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
 class CompanyProfile(SQLModel, table=True):
     """The user's own company profile — used by AI for context when generating pitches."""
 
@@ -99,7 +141,7 @@ class CompanyProfile(SQLModel, table=True):
     growth_stage: Optional[str] = None  # Pre-Seed, Seed, Series A, Series B+, Public
     geography: Optional[str] = None  # HQ location
     value_proposition: Optional[str] = None  # What the company does
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class GenerationRun(SQLModel, table=True):
@@ -107,7 +149,7 @@ class GenerationRun(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     status: str = "running"  # "running", "complete", "failed"
     product_ids: list[int] = Field(default_factory=list, sa_column=Column(JSON))
     product_names: list[str] = Field(default_factory=list, sa_column=Column(JSON))
@@ -123,7 +165,7 @@ class Lead(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     generation_run_id: Optional[int] = Field(default=None, foreign_key="generationrun.id", index=True)
 
     # Input fields
@@ -169,7 +211,7 @@ class Product(SQLModel, table=True):
         default=None, sa_column=Column(JSON)
     )  # [{"name": "Client", "website": "https://..."}]
     differentiator: Optional[str] = None  # What makes it special / USP
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=_utcnow)
 
 
 class ProductMatch(SQLModel, table=True):
@@ -182,7 +224,7 @@ class ProductMatch(SQLModel, table=True):
     match_reasoning: str  # Why this product fits this lead
     conversion_likelihood: Optional[str] = None  # "high", "medium", "low"
     conversion_reasoning: Optional[str] = None  # "Similar profile to 3 known converters..."
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
 
 class PitchDeck(SQLModel, table=True):
@@ -191,7 +233,7 @@ class PitchDeck(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
     product_id: int = Field(foreign_key="product.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     slides: list[PitchSlide] = Field(sa_column=Column(JSON))
     pptx_path: Optional[str] = None  # Path to generated PPTX file
 
@@ -202,7 +244,7 @@ class GeneratedEmail(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
     product_id: int = Field(foreign_key="product.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     contact_name: str
     contact_role: str
     subject: str
@@ -214,6 +256,6 @@ class PitchHistory(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     lead_id: int = Field(foreign_key="lead.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
     outcome: str  # "meeting_booked", "no_response", "rejected", "interested"
     notes: Optional[str] = None

@@ -82,9 +82,21 @@ async def generate_email(lead, product, match_reasoning: str, contact: dict | No
             contact_name = first.name
             contact_role = first.role
 
-    product_summary = f"Product: {product.name}\nDescription: {product.description}"
+    product_parts = [f"Product: {product.name}", f"Description: {product.description}"]
+    if product.features:
+        product_parts.append(f"Features: {', '.join(product.features)}")
     if product.differentiator:
-        product_summary += f"\nDifferentiator: {product.differentiator}"
+        product_parts.append(f"Differentiator: {product.differentiator}")
+    if product.pricing_model:
+        product_parts.append(f"Pricing: {product.pricing_model}")
+    if product.example_clients:
+        product_parts.append(f"Example clients: {', '.join(product.example_clients)}")
+    if product.current_clients:
+        client_names = [c["name"] if isinstance(c, dict) else str(c) for c in product.current_clients]
+        product_parts.append(f"Current clients: {', '.join(client_names)}")
+    if product.company_name:
+        product_parts.append(f"Sold by: {product.company_name}")
+    product_summary = "\n".join(product_parts)
 
     message = await _get_claude_client().messages.create(
         model="claude-haiku-4-5-20251001",

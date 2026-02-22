@@ -15,12 +15,12 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
   const { user } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  
-  const navItems: { icon: string; label: string; href: string }[] = [
-    { icon: "dashboard", label: "Dashboard", href: "/dashboard" },
-    { icon: "inventory_2", label: "Products", href: "/products" },
-    { icon: "wallet", label: "Billing", href: "/billing" },
-    { icon: "settings", label: "Setup", href: "/setup" },
+
+  const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
+    { icon: "dashboard", label: "Dashboard", page: "dashboard" },
+    { icon: "inventory_2", label: "Products", page: "products" },
+    { icon: "wallet", label: "Billing", page: "billing" },
+    { icon: "group", label: "LinkedIn", page: "linkedin-import" },
   ];
 
   const isActive = (href: string) => pathname === href;
@@ -54,11 +54,11 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-hide">
         {navItems.map((item) => {
-          const active = isActive(item.href);
+          const active = isActive(item.page);
           return (
             <button
-              key={item.href}
-              onClick={() => router.push(item.href)}
+              key={item.page}
+              onClick={() => router.push(item.page)}
               className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors group w-full text-left ${
                 active
                   ? "bg-slate-100 text-slate-900"

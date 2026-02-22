@@ -265,6 +265,10 @@ async def test_discovery_pipeline_empty_results(mock_async_session, mock_agent, 
 @pytest.mark.asyncio
 async def test_discovery_endpoint(client):
     """POST /api/discovery/run returns 200 with status."""
+    # Create a product first — endpoint returns 400 if none exist
+    await client.post("/api/products", json={
+        "products": [{"name": "TestProd", "description": "A test product"}],
+    })
     with patch("backend.main.run_discovery"):
         response = await client.post("/api/discovery/run", json={"max_companies": 5})
     assert response.status_code == 200
@@ -276,6 +280,9 @@ async def test_discovery_endpoint(client):
 @pytest.mark.asyncio
 async def test_discovery_endpoint_defaults(client):
     """POST /api/discovery/run works with default max_companies."""
+    await client.post("/api/products", json={
+        "products": [{"name": "TestProd", "description": "A test product"}],
+    })
     with patch("backend.main.run_discovery"):
         response = await client.post("/api/discovery/run", json={})
     assert response.status_code == 200

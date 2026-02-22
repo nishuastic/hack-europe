@@ -74,6 +74,13 @@ _ENRICHMENT_SCHEMA = {
             "description": "Known customers or clients of this company",
             "items": {"type": "string"},
         },
+        "company_fit": {
+            "type": "string",
+            "description": (
+                "Brief assessment of company's fit as a potential client "
+                "(e.g. 'Strong fit — high-growth SaaS in target vertical')"
+            ),
+        },
         "buying_signals": {
             "type": "array",
             "description": "Recent signals indicating buying intent or growth",
