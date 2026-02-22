@@ -54,7 +54,7 @@ export default function Header() {
           <aside className="absolute inset-y-0 left-0 w-64 bg-white shadow-xl flex flex-col">
             {/* Drawer header */}
             <div className="px-4 py-5 flex items-center justify-between border-b border-slate-200/60">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center">
                   <span
                     className="w-7 h-7 bg-black"
@@ -65,7 +65,7 @@ export default function Header() {
                     aria-label="Stick logo"
                   />
                 </div>
-                <h2 className="text-lg font-bold tracking-tight text-slate-900">Stick</h2>
+                <h2 className="text-lg font-bold tracking-tight text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>Stick</h2>
               </div>
               <button
                 onClick={() => setDrawerOpen(false)}

@@ -34,14 +34,17 @@ export default function DashboardPage() {
         setView={(v) => {
           if (v.page === "products") router.push("/products");
           if (v.page === "billing") router.push("/billing");
+          if (v.page === "analytics") router.push("/analytics");
+          if (v.page === "linkedin-import") router.push("/app");
           if (v.page === "onboard") router.push("/?view=onboard");
         }} 
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onProfileClick={() => router.push("/setup")}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-4 sm:p-6 md:p-8 w-full min-h-full">
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-8 w-full">
           <Dashboard
             onSelectRun={(id) => router.push(`/run/${id}`)}
           />

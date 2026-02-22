@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppView } from "@/lib/types";
 import { useAuth } from "@/components/AuthContext";
 import AuthPage from "@/components/AuthPage";
@@ -16,13 +17,20 @@ import ProductEdit from "@/components/ProductEdit";
 import LinkedInImport from "@/components/LinkedInImport";
 import Billing from "@/components/Billing";
 import Analytics from "@/components/Analytics";
-
 export default function AppPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const searchParams = useSearchParams();
   const [view, setView] = useState<AppView>({ page: "dashboard" });
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   const goTo = useCallback((v: AppView) => setView(v), []);
+
+  useEffect(() => {
+    const leadId = searchParams.get("leadId");
+    if (leadId) {
+      setView({ page: "lead-detail", leadId: Number(leadId) });
+    }
+  }, [searchParams]);
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -61,12 +69,12 @@ export default function AppPage() {
 
   return (
     <div className="flex h-screen overflow-hidden w-full">
-      <Sidebar view={view} setView={goTo} />
+      <Sidebar view={view} setView={goTo} onProfileClick={() => goTo({ page: "onboard" })} />
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <Header />
         <div className="flex-1 overflow-y-auto bg-[#f8f9fa]">
           {view.page === "dashboard" && (
-            <div className="p-4 sm:p-6 md:p-8">
+            <div className="p-6 md:p-8">
               <Dashboard
                 onSelectRun={(id) =>
                   goTo({ page: "generation-run-detail", runId: id })
@@ -75,30 +83,30 @@ export default function AppPage() {
             </div>
           )}
           {view.page === "generation-run-detail" && (
-            <div className="p-4 sm:p-6 md:p-8">
+            <div className="p-6 md:p-8">
               <GenerationRunDetail
                 runId={view.runId}
                 onBack={() => goTo({ page: "dashboard" })}
                 onSelectLead={(id) =>
-                  goTo({ page: "lead-detail", leadId: id })
+                  goTo({ page: "lead-detail", leadId: id, runId: view.runId })
                 }
               />
             </div>
           )}
           {view.page === "onboard" && (
-            <div className="p-4 sm:p-6 md:p-10">
+            <div className="p-6 md:p-8">
               <Onboard />
             </div>
           )}
           {view.page === "products" && (
-            <div className="p-4 sm:p-6 md:p-10">
+            <div className="p-6 md:p-8">
               <Products
                 onEdit={(id) => goTo({ page: "product-edit", productId: id })}
               />
             </div>
           )}
           {view.page === "product-edit" && (
-            <div className="p-4 sm:p-6 md:p-10">
+            <div className="p-6 md:p-8">
               <ProductEdit
                 productId={view.productId}
                 onBack={() => goTo({ page: "products" })}
@@ -108,24 +116,30 @@ export default function AppPage() {
           {view.page === "lead-detail" && (
             <LeadDetail
               leadId={view.leadId}
-              onBack={() => goTo({ page: "dashboard" })}
+              onBack={() => {
+                if (view.runId) {
+                  goTo({ page: "generation-run-detail", runId: view.runId });
+                } else {
+                  goTo({ page: "dashboard" });
+                }
+              }}
               onOpenPitchEditor={(productId) =>
                 goTo({ page: "pitch-editor", leadId: view.leadId, productId })
               }
             />
           )}
           {view.page === "linkedin-import" && (
-            <div className="p-4 sm:p-6 md:p-10">
+            <div className="p-6 md:p-8">
               <LinkedInImport />
             </div>
           )}
           {view.page === "analytics" && (
-            <div className="p-4 sm:p-6 md:p-10">
-              <Analytics />
+            <div className="p-6 md:p-8">
+              <Analytics onSelectLead={(id) => goTo({ page: "lead-detail", leadId: id })} />
             </div>
           )}
           {view.page === "billing" && (
-            <div className="p-4 sm:p-6 md:p-10">
+            <div className="p-6 md:p-8">
               <Billing />
             </div>
           )}

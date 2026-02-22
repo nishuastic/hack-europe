@@ -120,17 +120,16 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
   }, [featuresRef.isVisible, typedText, fullText]);
 
   return (
-    <div className="min-h-screen w-full bg-[#f8f9fa] overflow-y-auto">
+    <div className="min-h-screen w-full bg-[#f8f9fa] overflow-y-auto" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
       {/* Navigation */}
       <nav
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-          scrolled
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
             ? "bg-white/80 backdrop-blur-lg border-b border-slate-200 shadow-sm"
             : "bg-transparent"
-        }`}
+          }`}
       >
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0">
             <div className="w-15 h-15 rounded-lg flex items-center justify-center">
               <span
                 className="w-14 h-14 bg-amber-800"
@@ -141,7 +140,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 aria-label="Stick logo"
               />
             </div>
-            <span className="text-5xl font-semibold tracking-tight text-slate-900 font-sans">
+            <span className="text-5xl font-semibold tracking-tight text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>
               Stick
             </span>
           </div>
@@ -149,18 +148,21 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             <a
               href="#features"
               className="hidden sm:block text-sm text-slate-500 hover:text-slate-900 transition-colors px-3 py-1.5"
+              style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
             >
               Features
             </a>
             <a
               href="#how-it-works"
               className="hidden sm:block text-sm text-slate-500 hover:text-slate-900  px-3 py-1.5"
+              style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
             >
               How it works
             </a>
             <button
               onClick={onGetStarted}
               className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-lg hover:opacity-90 transition-all shadow-md"
+              style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
             >
               Get started
             </button>
@@ -171,32 +173,26 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* Hero */}
       <section className="pt-32 pb-20 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-1.5 mb-8 shadow-sm">
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs font-medium text-gray-800">
-              AI-powered prospection intelligence
-            </span>
-          </div>
 
           <h1
             ref={heroRef.ref}
-            className={`text-5xl sm:text-6xl lg:text-7xl font-heading font-bold tracking-tight text-slate-900 leading-[1.08] transition-all duration-1000 transform ${
-              heroRef.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-            }`}
+            style={{ fontFamily: "'Cormorant Garamond', serif" }}
+            className={`text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-slate-900 leading-[1.08] transition-all duration-1000 transform ${heroRef.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+              }`}
           >
             Spend minutes,
             <br />
-            <span className="italic underline decoration-wavy decoration-2">not days</span> finding
+            <span className="italic">not days</span> finding
             <br />
             client prospects
           </h1>
 
-          <p className="mt-6 text-lg sm:text-xl font-heading text-slate-500 max-w-2xl mx-auto leading-relaxed">
+          <p className="mt-6 text-lg sm:text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
             Add your products, discover target companies, and get AI-generated
             pitch decks and outreach — all matched to the right buyer, automatically.
           </p>
 
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
             <button
               onClick={onGetStarted}
               className="bg-slate-900 text-white text-base font-medium px-8 py-3.5 rounded-xl hover:opacity-90 transition-all shadow-lg flex items-center gap-2"
@@ -217,7 +213,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
         {/* Hero visual — mock dashboard */}
         <div className="max-w-5xl mx-auto mt-16">
-          <div className="clay-card rounded-2xl overflow-hidden">
+          <div className="clay-card rounded-2xl overflow-hidden" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
             <div className="bg-slate-900 px-4 py-2.5 flex items-center gap-2">
               <div className="flex gap-1.5">
                 <div className="w-3 h-3 rounded-full bg-red-400" />
@@ -331,13 +327,12 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
                     <span className="hidden sm:block">
                       <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          row.status === "complete"
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${row.status === "complete"
                             ? "bg-green-50 text-green-700"
                             : row.status === "enriching"
                               ? "bg-blue-50 text-blue-700"
                               : "bg-slate-100 text-slate-500"
-                        }`}
+                          }`}
                       >
                         {row.status}
                       </span>
@@ -362,7 +357,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* Logos / social proof */}
       <section className="py-12 border-y border-slate-200 bg-white">
         <div className="max-w-5xl mx-auto px-6 text-center">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-8">
+          <p className="text-base font-extrabold text-gray-600 uppercase tracking-widest mb-8">
             Built with leading AI and data infrastructure
           </p>
           <div className="flex items-center justify-center gap-12 sm:gap-20 flex-wrap">
@@ -378,19 +373,19 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       <section
         ref={featuresRef.ref}
         id="features"
-        className={`py-24 px-6 transition-all duration-1000 transform ${
-          featuresRef.isVisible
+        className={`py-24 px-6 transition-all duration-1000 transform ${featuresRef.isVisible
             ? "opacity-100 translate-y-0"
             : "opacity-0 translate-y-12"
-        }`}
+          }`}
       >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+            <p className="text-base font-extrabold text-gray-600 uppercase tracking-widest mb-3">
               Features
             </p>
             <h2
-              className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900"
+              className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
+              style={{ fontFamily: "'Cormorant Garamond', serif" }}
             >
               {typedText.split("\n").map((line, i) => (
                 <span key={i}>
@@ -401,13 +396,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 </span>
               ))}
             </h2>
-            <p className="mt-4 text-slate-500 max-w-xl mx-auto">
+            <p className="mt-4 text-slate-500 max-w-xl mx-auto" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
               From company discovery to personalized pitch decks — Stick
               automates the entire top-of-funnel workflow.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-14">
             {[
               {
                 icon: "travel_explore",
@@ -442,24 +437,23 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             ].map((feature, i) => (
               <div
                 key={i}
-                className={`clay-card rounded-2xl p-6 hover:shadow-md transition-all duration-700 transform ${
-                  featuresRef.isVisible
+                className={`transition-all duration-700 transform ${featuresRef.isVisible
                     ? "opacity-100 translate-y-0"
                     : "opacity-0 translate-y-12"
-                }`}
+                  }`}
                 style={{
                   transitionDelay: featuresRef.isVisible ? `${i * 100}ms` : "0ms",
                 }}
               >
-                <div className="mb-4">
-                  <span className="material-symbols-outlined text-3xl text-slate-900">
+                <div className="mb-3">
+                  <span className="material-symbols-outlined text-2xl text-slate-400">
                     {feature.icon}
                   </span>
                 </div>
-                <h3 className="text-base font-semibold text-slate-900 mb-2">
+                <h3 className="text-lg font-bold text-slate-900 mb-2" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
                   {feature.title}
                 </h3>
-                <p className="text-sm text-slate-500 leading-relaxed">
+                <p className="text-sm text-slate-500 leading-relaxed" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
                   {feature.desc}
                 </p>
               </div>
@@ -472,19 +466,19 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       <section
         ref={howItWorksRef.ref}
         id="how-it-works"
-        className={`py-24 px-6 bg-white border-y border-slate-200 transition-all duration-1000 transform ${
-          howItWorksRef.isVisible
+        className={`py-24 px-6 bg-white border-y border-slate-200 transition-all duration-1000 transform ${howItWorksRef.isVisible
             ? "opacity-100 translate-y-0"
             : "opacity-0 translate-y-12"
-        }`}
+          }`}
       >
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
+            <p className="text-base font-extrabold text-gray-600 uppercase tracking-widest mb-3">
               How it works
             </p>
             <h2
-              className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900"
+              className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
+              style={{ fontFamily: "'Cormorant Garamond', serif" }}
             >
               Three steps to your first pitch
             </h2>
@@ -513,11 +507,10 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             ].map((step, i) => (
               <div
                 key={i}
-                className={`text-center transition-all duration-700 transform ${
-                  howItWorksRef.isVisible
+                className={`text-center transition-all duration-700 transform ${howItWorksRef.isVisible
                     ? "opacity-100 translate-x-0"
                     : "opacity-0 -translate-x-12"
-                }`}
+                  }`}
                 style={{
                   transitionDelay: howItWorksRef.isVisible ? `${i * 150}ms` : "0ms",
                 }}
@@ -531,7 +524,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                   </span>
                 </div>
                 <h3
-                  className="text-lg font-heading font-semibold text-slate-900 mb-2"
+                  className="text-lg font-semibold text-slate-900 mb-2"
+                  style={{ fontFamily: "'Cormorant Garamond', serif" }}
                 >
                   {step.title}
                 </h3>
@@ -549,7 +543,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="max-w-5xl mx-auto">
           <div className="clay-card rounded-2xl p-10 sm:p-14">
             <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-slate-900">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
                 Built for speed and scale
               </h2>
               <p className="mt-3 text-slate-500 max-w-lg mx-auto">
@@ -576,20 +570,18 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* CTA */}
-      <section className="py-24 px-6 bg-slate-900">
+      <section className="py-16 px-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-white"
-          >
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
             Stop searching. Start selling.
-
           </h2>
-          <p className="mt-4 text-gray-400 text-lg max-w-xl mx-auto">
+          <p className="mt-3 text-slate-500 max-w-xl mx-auto">
             Stick is your AI sales team — it discovers, researches, matches,
             and pitches. All you have to do is close.
           </p>
           <button
             onClick={onGetStarted}
-            className="mt-10 bg-white text-slate-900 text-base font-semibold px-8 py-3.5 rounded-xl hover:bg-slate-50 transition-all shadow-lg inline-flex items-center gap-2"
+            className="mt-8 bg-slate-900 text-white text-base font-semibold px-8 py-3.5 rounded-xl hover:bg-slate-800 transition-all shadow-lg inline-flex items-center gap-2"
           >
             Get started for free
             <span className="material-symbols-outlined text-[20px]">
@@ -600,29 +592,42 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 px-6 bg-slate-900 border-t border-slate-800">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-white flex items-center justify-center">
+      <footer className="border-t border-slate-200 bg-white" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            {/* Brand */}
+            <div className="flex items-center gap-1">
               <span
-                className="w-6 h-6 bg-amber-800"
+                className="w-8 h-8 bg-slate-900"
                 style={{
                   WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
                   mask: "url('/stick_2.svg') center / contain no-repeat",
                 }}
-                aria-label="Stick logo"
               />
+              <span className="text-2xl font-semibold text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>
+                Stick
+              </span>
             </div>
-            <span
-              className="text-sm font-medium text-white"
-              style={{ fontFamily: "Helvetica" }}
-            >
-              Stick
-            </span>
+
+            {/* Nav links — horizontal */}
+            <nav className="flex items-center gap-6">
+              <a href="#features" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Features</a>
+              <a href="#how-it-works" className="text-sm text-slate-500 hover:text-slate-900 transition-colors">How it works</a>
+              <button onClick={onGetStarted} className="text-sm text-slate-500 hover:text-slate-900 transition-colors">Get started</button>
+            </nav>
           </div>
-          <p className="text-xs text-slate-500">
-            Built at HackEurope 2025. Powered by Anthropic, LinkUp, Stripe &amp; Paid.ai.
-          </p>
+
+          {/* Bottom bar */}
+          <div className="mt-12 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-slate-400">
+              &copy; {new Date().getFullYear()} Stick. Built at HackEurope 2026.
+            </p>
+            <div className="flex items-center gap-4">
+              <a href="https://github.com/nishuastic/hack-europe" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-slate-600 transition-colors">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
+              </a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>

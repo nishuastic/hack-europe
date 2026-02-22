@@ -8,9 +8,10 @@ interface SidebarProps {
   setView: (v: AppView) => void;
   collapsed?: boolean;
   onToggle?: () => void;
+  onProfileClick?: () => void;
 }
 
-export default function Sidebar({ view, setView, collapsed = false, onToggle }: SidebarProps) {
+export default function Sidebar({ view, setView, collapsed = false, onToggle, onProfileClick }: SidebarProps) {
   const { user } = useAuth();
 
   const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
@@ -24,45 +25,63 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
   const isActive = (page: AppView["page"]) => view.page === page;
 
   return (
-    <aside className={`bg-white border-r border-slate-200/60 flex flex-col z-20 hidden md:flex shrink-0 h-screen transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
+    <aside className={`hidden md:flex flex-col bg-white border-r border-slate-200/60 z-20 shrink-0 h-screen transition-all duration-300 ease-in-out ${collapsed ? 'w-[60px]' : 'w-52'}`}>
       {/* Logo & Toggle */}
-      <div className="px-4 py-5 flex items-center gap-3 relative">
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
-          <span
-            className="w-7 h-7 bg-black"
-            style={{
-              WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
-              mask: "url('/stick_2.svg') center / contain no-repeat",
-            }}
-            aria-label="Stick logo"
-          />
-        </div>
-        {!collapsed && (
-          <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-900">
-            Stick
-          </h2>
-        )}
-        {onToggle && (
+      <div className={`py-5 flex items-center shrink-0 overflow-visible ${collapsed ? 'flex-col gap-1 px-0' : 'px-3 gap-1'}`}>
+        {collapsed ? (
+          /* Collapsed: show chevron button to expand */
           <button
             onClick={onToggle}
-            className={`ml-auto p-1 rounded hover:bg-slate-100 transition-colors ${collapsed ? 'absolute right-2' : ''}`}
+            className="w-10 h-10 rounded-lg flex items-center justify-center hover:bg-slate-100 transition-colors mx-auto"
+            title="Expand sidebar"
           >
-            <span className="material-symbols-outlined text-[18px] text-slate-400">
-              {collapsed ? 'chevron_right' : 'chevron_left'}
+            <span className="material-symbols-outlined text-[22px] text-slate-500">
+              chevron_right
             </span>
           </button>
+        ) : (
+          /* Expanded: logo + title + collapse chevron */
+          <>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
+              <span
+                className="w-7 h-7 bg-black"
+                style={{
+                  WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
+                  mask: "url('/stick_2.svg') center / contain no-repeat",
+                }}
+                aria-label="Stick logo"
+              />
+            </div>
+            <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-900 flex-1 min-w-0" style={{ fontFamily: "'Playfair Display', serif" }}>
+              Stick
+            </h2>
+            {onToggle && (
+              <button
+                onClick={onToggle}
+                className="p-1.5 rounded-md hover:bg-slate-100 transition-colors shrink-0"
+                title="Collapse sidebar"
+              >
+                <span className="material-symbols-outlined text-[20px] text-slate-500">
+                  chevron_left
+                </span>
+              </button>
+            )}
+          </>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-hide">
+      <nav className={`flex-1 py-4 space-y-1 overflow-y-auto scrollbar-hide ${collapsed ? 'px-1.5' : 'px-2'}`}>
         {navItems.map((item) => {
           const active = isActive(item.page);
           return (
             <button
               key={item.page}
               onClick={() => setView({ page: item.page } as AppView)}
-              className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors group w-full text-left ${
+              title={collapsed ? item.label : undefined}
+              className={`flex items-center gap-3 py-2 text-sm font-medium rounded-lg transition-colors group w-full ${
+                collapsed ? 'justify-center px-0' : 'text-left px-3'
+              } ${
                 active
                   ? "bg-slate-100 text-slate-900"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
@@ -77,17 +96,21 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
               >
                 {item.icon}
               </span>
-              {!collapsed && item.label}
+              {!collapsed && <span className="truncate">{item.label}</span>}
             </button>
           );
-        }        )}
-
-        {/* User */}
+        })}
       </nav>
 
       {/* User */}
-      <div className="p-4 border-t border-slate-200/60">
-        <button className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-slate-50 transition-colors text-left">
+      <div className={`border-t border-slate-200/60 ${collapsed ? 'p-2' : 'p-4'}`}>
+        <button
+          onClick={onProfileClick}
+          title={collapsed ? (user?.name || "Profile") : undefined}
+          className={`flex items-center w-full rounded-lg hover:bg-slate-50 transition-colors ${
+            collapsed ? 'justify-center p-1.5' : 'gap-3 p-2 text-left'
+          }`}
+        >
           <div className="size-8 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 flex items-center justify-center border border-white shadow-sm text-xs font-bold text-slate-600 shrink-0">
             {user?.name?.charAt(0).toUpperCase() || "U"}
           </div>

@@ -35,14 +35,17 @@ function BillingPageContent() {
         setView={(v) => {
           if (v.page === "dashboard") router.push("/dashboard");
           if (v.page === "products") router.push("/products");
+          if (v.page === "analytics") router.push("/analytics");
+          if (v.page === "linkedin-import") router.push("/app");
           if (v.page === "onboard") router.push("/?view=onboard");
         }} 
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onProfileClick={() => router.push("/setup")}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] w-full">
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-8 w-full">
           <Billing />
         </div>
       </main>
