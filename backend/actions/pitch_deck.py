@@ -78,6 +78,9 @@ def _build_product_summary(product) -> str:
         parts.append(f"Differentiator: {product.differentiator}")
     if product.example_clients:
         parts.append(f"Example clients: {', '.join(product.example_clients)}")
+    if product.current_clients:
+        client_names = [c["name"] if isinstance(c, dict) else str(c) for c in product.current_clients]
+        parts.append(f"Current clients: {', '.join(client_names)}")
     if product.pricing_model:
         parts.append(f"Pricing: {product.pricing_model}")
     if product.company_name:

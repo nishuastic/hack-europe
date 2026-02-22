@@ -49,7 +49,19 @@ app.dependency_overrides[get_session] = _override_session
 
 @pytest_asyncio.fixture
 async def client():
-    """Async HTTP client hitting the FastAPI app directly."""
+    """Async HTTP client with auto-registered user + auth token + 100 free credits."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        resp = await ac.post("/api/auth/register", json={
+            "email": "test@example.com", "password": "testpass123", "name": "Test User",
+        })
+        token = resp.json()["access_token"]
+        ac.headers["Authorization"] = f"Bearer {token}"
         yield ac
+
+
+# Keep authed_client as alias for backwards compat
+@pytest_asyncio.fixture
+async def authed_client(client: AsyncClient):
+    """Alias for client — already authenticated."""
+    yield client

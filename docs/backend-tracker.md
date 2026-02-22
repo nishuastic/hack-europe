@@ -27,7 +27,6 @@ uv run pytest backend/tests/ -v    # 60+ tests
 ANTHROPIC_API_KEY=sk-ant-...
 LINKUP_API_KEY=...
 JWT_SECRET_KEY=...                 # For auth tokens
-ELEVENLABS_API_KEY=...             # Phase 3
 STRIPE_SECRET_KEY=sk_test_...      # Phase 3
 ```
 
@@ -81,8 +80,6 @@ STRIPE_SECRET_KEY=sk_test_...      # Phase 3
 ## Remaining Work
 
 ### Phase 3 — Integrations
-- [ ] `backend/actions/voice_summary.py` — ElevenLabs TTS voice briefing
-- [ ] `POST /api/leads/{id}/voice` endpoint
 - [ ] Stripe billing: checkout session, credit metering, credits endpoint
 - [ ] `POST /api/billing/checkout`, `GET /api/billing/credits`
 
@@ -152,17 +149,11 @@ Claude plans the sequence and calls tools autonomously.
 
 ---
 
-## Phase 3 — Stripe + ElevenLabs (Hours 14-20)
+## Phase 3 — Stripe (Hours 14-20)
 
 ### Files to Create
-- [ ] `backend/actions/voice_summary.py` — ElevenLabs TTS
 - [ ] `backend/billing/__init__.py`
 - [ ] `backend/billing/stripe_billing.py` — Checkout + metering
-
-### ElevenLabs Voice
-- `POST /api/leads/{id}/voice` → generate 30s audio briefing
-- Use Claude to write the script, ElevenLabs to speak it
-- Return audio URL/blob
 
 ### Stripe Integration
 - Create Stripe product + price in test mode

@@ -76,6 +76,8 @@ def _build_lead_profile(lead: Lead) -> str:
     sections = [f"Company: {lead.company_name}"]
     if lead.description:
         sections.append(f"Description: {lead.description}")
+    if lead.company_fit:
+        sections.append(f"Company fit: {lead.company_fit}")
     if lead.industry:
         sections.append(f"Industry: {lead.industry}")
     if lead.funding:
@@ -135,14 +137,16 @@ async def match_lead_to_products(lead: Lead, products: list[Product]) -> list[di
         model="claude-haiku-4-5-20251001",
         max_tokens=2000,
         system=system_prompt,
-        messages=[{
-            "role": "user",
-            "content": (
-                f"## Target Company Profile\n{lead_profile}\n\n"
-                f"## Product Catalog\n{product_catalog}\n\n"
-                f"Match ALL products to this company. Return JSON."
-            ),
-        }],
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    f"## Target Company Profile\n{lead_profile}\n\n"
+                    f"## Product Catalog\n{product_catalog}\n\n"
+                    f"Match ALL products to this company. Return JSON."
+                ),
+            }
+        ],
     )
 
     response_text: str = message.content[0].text  # type: ignore[union-attr]
@@ -171,20 +175,24 @@ async def generate_all_matches(ws_manager, user_id: int) -> None:
             logger.warning("No enriched leads or no products — skipping matching")
             return
 
-        await ws_manager.broadcast({
-            "type": "matching_start",
-            "total_leads": len(leads),
-            "total_products": len(products),
-        })
+        await ws_manager.broadcast(
+            {
+                "type": "matching_start",
+                "total_leads": len(leads),
+                "total_products": len(products),
+            }
+        )
 
         for lead in leads:
             try:
-                await ws_manager.broadcast({
-                    "type": "agent_thinking",
-                    "lead_id": lead.id,
-                    "action": "matching",
-                    "detail": f"Matching {lead.company_name} against {len(products)} products",
-                })
+                await ws_manager.broadcast(
+                    {
+                        "type": "agent_thinking",
+                        "lead_id": lead.id,
+                        "action": "matching",
+                        "detail": f"Matching {lead.company_name} against {len(products)} products",
+                    }
+                )
 
                 matches = await match_lead_to_products(lead, products)
 
@@ -194,10 +202,12 @@ async def generate_all_matches(ws_manager, user_id: int) -> None:
                         continue
 
                     # Upsert: delete existing match for this pair, then create new
-                    existing = (await session.execute(
-                        select(ProductMatch).where(
-                            ProductMatch.lead_id == lead.id,
-                            ProductMatch.product_id == product_id,
+                    existing = (
+                        await session.execute(
+                            select(ProductMatch).where(
+                                ProductMatch.lead_id == lead.id,
+                                ProductMatch.product_id == product_id,
+                            )
                         )
                     ).scalar_one_or_none()
                     if existing:
@@ -215,21 +225,25 @@ async def generate_all_matches(ws_manager, user_id: int) -> None:
                     session.add(match_record)
                     await session.commit()
 
-                    await ws_manager.broadcast({
-                        "type": "match_update",
-                        "lead_id": lead.id,
-                        "product_id": product_id,
-                        "match_score": match_record.match_score,
-                        "match_reasoning": match_record.match_reasoning,
-                        "conversion_likelihood": match_record.conversion_likelihood,
-                    })
+                    await ws_manager.broadcast(
+                        {
+                            "type": "match_update",
+                            "lead_id": lead.id,
+                            "product_id": product_id,
+                            "match_score": match_record.match_score,
+                            "match_reasoning": match_record.match_reasoning,
+                            "conversion_likelihood": match_record.conversion_likelihood,
+                        }
+                    )
 
             except Exception as e:
                 logger.exception(f"Matching failed for lead {lead.id}")
-                await ws_manager.broadcast({
-                    "type": "matching_error",
-                    "lead_id": lead.id,
-                    "error": str(e),
-                })
+                await ws_manager.broadcast(
+                    {
+                        "type": "matching_error",
+                        "lead_id": lead.id,
+                        "error": str(e),
+                    }
+                )
 
         await ws_manager.broadcast({"type": "matching_complete"})

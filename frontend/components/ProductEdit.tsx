@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 
 interface ProductEditProps {
@@ -10,20 +10,42 @@ interface ProductEditProps {
 
 export default function ProductEdit({ productId, onBack }: ProductEditProps) {
   const isNew = !productId;
-  const [name, setName] = useState(isNew ? "" : "ChurnPredict");
-  const [description, setDescription] = useState(
-    isNew
-      ? ""
-      : "An AI-powered analytics dashboard that predicts which customers are likely to cancel their subscription in the next 30 days.",
-  );
-  const [features, setFeatures] = useState(
-    isNew ? [""] : ["Real-time usage tracking", "Automated email triggers", ""],
-  );
-  const [differentiator, setDifferentiator] = useState(
-    isNew
-      ? ""
-      : "Unlike traditional analytics that just show historical data, ChurnPredict uses predictive modeling to flag at-risk accounts before they leave, with 94% accuracy.",
-  );
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [features, setFeatures] = useState([""]);
+  const [differentiator, setDifferentiator] = useState("");
+  const [industryFocus, setIndustryFocus] = useState("");
+  const [pricingModel, setPricingModel] = useState("");
+  const [companySizeTarget, setCompanySizeTarget] = useState("");
+  const [geography, setGeography] = useState("");
+  const [stage, setStage] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [website, setWebsite] = useState("");
+  const [exampleClients, setExampleClients] = useState([""]);
+  const [currentClients, setCurrentClients] = useState<{name: string; website: string}[]>([{name: "", website: ""}]);
+  const [loadingProduct, setLoadingProduct] = useState(!isNew);
+
+  useEffect(() => {
+    if (!productId) return;
+    api.getProducts().then((products) => {
+      const product = products.find((p) => p.id === productId);
+      if (product) {
+        setName(product.name);
+        setDescription(product.description);
+        setFeatures(product.features?.length ? [...product.features, ""] : [""]);
+        setDifferentiator(product.differentiator || "");
+        setIndustryFocus(product.industry_focus || "");
+        setPricingModel(product.pricing_model || "");
+        setCompanySizeTarget(product.company_size_target || "");
+        setGeography(product.geography || "");
+        setStage(product.stage || "");
+        setCompanyName(product.company_name || "");
+        setWebsite(product.website || "");
+        setExampleClients(product.example_clients?.length ? [...product.example_clients, ""] : [""]);
+        setCurrentClients((product as any).current_clients?.length ? [...(product as any).current_clients, {name: "", website: ""}] : [{name: "", website: ""}]);
+      }
+    }).finally(() => setLoadingProduct(false));
+  }, [productId]);
 
   const updateFeature = (idx: number, val: string) => {
     const next = [...features];
@@ -46,25 +68,62 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
 
   const [saving, setSaving] = useState(false);
 
+  const updateExampleClient = (idx: number, val: string) => {
+    const next = [...exampleClients];
+    next[idx] = val;
+    setExampleClients(next);
+    if (idx === exampleClients.length - 1 && val.trim() !== "" && exampleClients.length < 10) {
+      setExampleClients([...next, ""]);
+    }
+  };
+
+  const removeExampleClient = (idx: number) => {
+    if (exampleClients.length > 1) {
+      setExampleClients(exampleClients.filter((_, i) => i !== idx));
+    }
+  };
+
+  const updateCurrentClient = (idx: number, field: "name" | "website", val: string) => {
+    const next = [...currentClients];
+    next[idx] = { ...next[idx], [field]: val };
+    setCurrentClients(next);
+    if (idx === currentClients.length - 1 && val.trim() !== "" && currentClients.length < 10) {
+      setCurrentClients([...next, {name: "", website: ""}]);
+    }
+  };
+
+  const removeCurrentClient = (idx: number) => {
+    if (currentClients.length > 1) {
+      setCurrentClients(currentClients.filter((_, i) => i !== idx));
+    }
+  };
+
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
     try {
       const cleanFeatures = features.filter((f) => f.trim());
+      const cleanClients = exampleClients.filter((c) => c.trim());
+      const cleanCurrentClients = currentClients.filter((c) => c.name.trim() || c.website.trim());
+      const productData = {
+        name,
+        description,
+        features: cleanFeatures,
+        differentiator: differentiator || undefined,
+        industry_focus: industryFocus || undefined,
+        pricing_model: pricingModel || undefined,
+        company_size_target: companySizeTarget || undefined,
+        geography: geography || undefined,
+        stage: stage || undefined,
+        company_name: companyName || undefined,
+        website: website || undefined,
+        example_clients: cleanClients.length ? cleanClients : undefined,
+        current_clients: cleanCurrentClients.length ? cleanCurrentClients : undefined,
+      };
       if (isNew) {
-        await api.createProduct({
-          name,
-          description,
-          features: cleanFeatures,
-          differentiator,
-        });
+        await api.createProduct(productData);
       } else {
-        await api.updateProduct(productId!, {
-          name,
-          description,
-          features: cleanFeatures,
-          differentiator,
-        });
+        await api.updateProduct(productId!, productData);
       }
       onBack();
     } catch (e) {
@@ -73,6 +132,14 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
       setSaving(false);
     }
   };
+
+  if (loadingProduct) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-400">
+        <span className="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto flex flex-col gap-8 pb-10">
@@ -191,7 +258,7 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
                 ))}
               </div>
             </div>
-            <div className="mb-8">  {/* Added margin-bottom for spacing below the grey box */}
+            <div className="mb-8">
               <label className="block text-sm font-semibold text-slate-700 mb-3">
                 Main Differentiator
               </label>
@@ -210,6 +277,162 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
                   <span>Crucial for pitch generation</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Targeting & Market */}
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Targeting &amp; Market</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Industry Focus</label>
+                <input
+                  value={industryFocus}
+                  onChange={(e) => setIndustryFocus(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400 text-sm"
+                  placeholder="e.g. FinTech, Healthcare"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Pricing Model</label>
+                <select
+                  value={pricingModel}
+                  onChange={(e) => setPricingModel(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all text-sm"
+                >
+                  <option value="">Select...</option>
+                  <option value="SaaS">SaaS</option>
+                  <option value="project-based">Project-based</option>
+                  <option value="retainer">Retainer</option>
+                  <option value="usage-based">Usage-based</option>
+                  <option value="license">License</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Company Size Target</label>
+                <select
+                  value={companySizeTarget}
+                  onChange={(e) => setCompanySizeTarget(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all text-sm"
+                >
+                  <option value="">Select...</option>
+                  <option value="SMB">SMB</option>
+                  <option value="mid-market">Mid-market</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Geography</label>
+                <input
+                  value={geography}
+                  onChange={(e) => setGeography(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400 text-sm"
+                  placeholder="e.g. US, Europe, Global"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Stage</label>
+                <select
+                  value={stage}
+                  onChange={(e) => setStage(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all text-sm"
+                >
+                  <option value="">Select...</option>
+                  <option value="startup">Startup</option>
+                  <option value="scaling">Scaling</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Seller Info */}
+          <div className="border-t border-slate-100 pt-6">
+            <h3 className="text-sm font-semibold text-slate-700 mb-4">Seller Info</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Company Name</label>
+                <input
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400 text-sm"
+                  placeholder="Your company name"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Website</label>
+                <input
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400 text-sm"
+                  placeholder="https://yourcompany.com"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Example Clients */}
+          <div className="border-t border-slate-100 pt-6">
+            <label className="block text-sm font-semibold text-slate-700 mb-3">
+              Example Clients
+            </label>
+            <div className="space-y-2">
+              {exampleClients.map((client, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={client}
+                    onChange={(e) => updateExampleClient(idx, e.target.value)}
+                    placeholder={`Client ${idx + 1}`}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  />
+                  {exampleClients.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeExampleClient(idx)}
+                      className="px-2 py-1 text-red-600 hover:text-red-800"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Current Clients */}
+          <div className="border-t border-slate-100 pt-6">
+            <label className="block text-sm font-semibold text-slate-700 mb-3">
+              Current Clients (with website)
+            </label>
+            <div className="space-y-2">
+              {currentClients.map((client, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={client.name}
+                    onChange={(e) => updateCurrentClient(idx, "name", e.target.value)}
+                    placeholder={`Client ${idx + 1} name`}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={client.website}
+                    onChange={(e) => updateCurrentClient(idx, "website", e.target.value)}
+                    placeholder="Website URL"
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  />
+                  {currentClients.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeCurrentClient(idx)}
+                      className="px-2 py-1 text-red-600 hover:text-red-800"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         </div>

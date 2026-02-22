@@ -1,446 +1,277 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, Lead, WSMessage } from "@/lib/api";
+import { api, GenerationRun, Product, ProductSnapshot, WSMessage } from "@/lib/api";
 
 interface DashboardProps {
-  onSelectLead: (id: number) => void;
-}
-
-const DEMO_LEADS: Lead[] = [
-  {
-    id: 1,
-    company_name: "Acme Corp",
-    company_url: "acme.com",
-    industry: "Manufacturing",
-    employees: 2500,
-    revenue: "$500M - $1B",
-    best_match_score: 9.0,
-    enrichment_status: "complete",
-    pitch_deck_generated: true,
-    email_generated: true,
-  },
-  {
-    id: 2,
-    company_name: "Stratos AI",
-    company_url: "stratos.ai",
-    industry: "Technology",
-    employees: 120,
-    revenue: "$10M - $50M",
-    best_match_score: 8.2,
-    enrichment_status: "in_progress",
-    pitch_deck_generated: false,
-    email_generated: true,
-  },
-  {
-    id: 3,
-    company_name: "Global Logistics",
-    company_url: "globallog.co",
-    industry: "Transportation",
-    employees: 12000,
-    revenue: "$2B+",
-    best_match_score: 7.5,
-    enrichment_status: "pending",
-    pitch_deck_generated: false,
-    email_generated: false,
-  },
-  {
-    id: 4,
-    company_name: "Nexus Tech",
-    company_url: "nexustech.io",
-    industry: "Software",
-    employees: 350,
-    revenue: "$50M - $100M",
-    best_match_score: 5.4,
-    enrichment_status: "complete",
-    pitch_deck_generated: true,
-    email_generated: true,
-  },
-  {
-    id: 5,
-    company_name: "Cyberdyne Systems",
-    company_url: "cyberdyne.net",
-    industry: "Defense",
-    employees: 6000,
-    revenue: "$2.5B",
-    best_match_score: 2.5,
-    enrichment_status: "failed",
-    pitch_deck_generated: false,
-    email_generated: false,
-  },
-] as Lead[];
-
-const ROW_ICONS = [
-  "business",
-  "science",
-  "local_shipping",
-  "terminal",
-  "shield",
-];
-
-function empRange(n?: number) {
-  if (!n) return "-";
-  if (n < 50) return "1 - 50";
-  if (n < 200) return "50 - 200";
-  if (n < 500) return "200 - 500";
-  if (n < 1000) return "500 - 1,000";
-  if (n < 5000) return "1,000 - 5,000";
-  if (n < 10000) return "5,000+";
-  return "10,000+";
+  onSelectRun: (id: number) => void;
 }
 
 function statusDot(s: string) {
   if (s === "complete") return "bg-slate-400";
-  if (s === "in_progress") return "bg-slate-300 animate-pulse";
+  if (s === "running") return "bg-slate-300 animate-pulse";
   if (s === "failed") return "bg-slate-400 opacity-30";
   return "border border-slate-300";
 }
 
 function statusLabel(s: string) {
   if (s === "complete") return "Complete";
-  if (s === "in_progress") return "In Progress";
+  if (s === "running") return "Running";
   if (s === "failed") return "Failed";
   return "Pending";
 }
 
-function barColor(score: number) {
-  if (score >= 8) return "bg-slate-800";
-  if (score >= 6) return "bg-slate-600";
-  if (score >= 4) return "bg-slate-500";
-  return "bg-slate-300";
+function timeAgo(dateStr: string) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "Just now";
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
 }
 
-export default function Dashboard({ onSelectLead }: DashboardProps) {
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [search, setSearch] = useState("");
+export default function Dashboard({ onSelectRun }: DashboardProps) {
+  const [runs, setRuns] = useState<GenerationRun[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
   const [generating, setGenerating] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [showFilters, setShowFilters] = useState(false);
+  const [discoveryPhase, setDiscoveryPhase] = useState<string>("");
+  const [discoveryProgress, setDiscoveryProgress] = useState<string>("");
+  const [viewingSnapshot, setViewingSnapshot] = useState<GenerationRun | null>(null);
 
-  const fetchLeads = () => {
+  const fetchRuns = () => {
     api
-      .getLeads()
-      .then(setLeads)
-      .catch(() => setLeads(DEMO_LEADS))
+      .getGenerationRuns()
+      .then((data) => setRuns(data))
+      .catch((err) => console.error("Failed to fetch runs:", err))
       .finally(() => setLoading(false));
   };
 
   useEffect(() => {
-    fetchLeads();
+    fetchRuns();
 
-    // Connect WebSocket for live updates
+    // Poll for updates while any run is still running
+    const interval = setInterval(() => {
+      api.getGenerationRuns().then((newRuns) => {
+        setRuns(newRuns);
+        if (!newRuns.some((r) => r.status === "running")) {
+          setGenerating(false);
+          setDiscoveryPhase("");
+          setDiscoveryProgress("");
+        }
+      }).catch(() => {});
+    }, 5000);
+
+    // Listen for discovery progress updates
     api.connectWebSocket();
     const unsubscribe = api.onMessage((msg: WSMessage) => {
-      if (msg.type === "cell_update") {
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === msg.lead_id ? { ...l, [msg.field]: msg.value } : l,
-          ),
-        );
-      } else if (msg.type === "enrichment_complete") {
-        // Re-fetch to get the full updated lead
-        api
-          .getLead(msg.lead_id)
-          .then((updated) => {
-            setLeads((prev) =>
-              prev.map((l) => (l.id === updated.id ? updated : l)),
-            );
-          })
-          .catch(() => {});
-      } else if (msg.type === "enrichment_start") {
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === msg.lead_id
-              ? { ...l, enrichment_status: "in_progress" }
-              : l,
-          ),
-        );
-      } else if (msg.type === "enrichment_error") {
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === msg.lead_id ? { ...l, enrichment_status: "failed" } : l,
-          ),
-        );
-      } else if (msg.type === "match_update") {
-        setLeads((prev) =>
-          prev.map((l) =>
-            l.id === msg.lead_id
-              ? {
-                  ...l,
-                  best_match_score: msg.match_score,
-                  best_match_product: msg.product_name,
-                }
-              : l,
-          ),
-        );
+      if (msg.type === "discovery_start") {
+        setDiscoveryPhase("Starting discovery...");
+        setDiscoveryProgress(`Searching for up to ${msg.max_companies} companies across ${msg.product_count} products`);
+      } else if (msg.type === "discovery_thinking") {
+        const phaseName = msg.iteration === 1 ? "Searching" : "Evaluating";
+        setDiscoveryPhase(`${phaseName}...`);
+        setDiscoveryProgress(msg.detail);
+      } else if (msg.type === "discovery_complete") {
+        setGenerating(false);
+        setDiscoveryPhase("");
+        setDiscoveryProgress("");
+        fetchRuns();
+      } else if (msg.type === "company_discovered") {
+        setDiscoveryPhase("Company found!");
+        setDiscoveryProgress(msg.why_good_fit || msg.company_name);
       }
     });
 
     return () => {
+      clearInterval(interval);
       unsubscribe();
     };
   }, []);
 
-  const handleGenerate = async () => {
-    setGenerating(true);
+  const handleGenerateClick = async () => {
+    // Load products for selection
     try {
-      await api.runDiscovery();
-      // After discovery starts, periodically refresh leads as they come in
-      const interval = setInterval(() => {
-        api
-          .getLeads()
-          .then((newLeads) => {
-            if (newLeads.length > 0) setLeads(newLeads);
-          })
-          .catch(() => {});
-      }, 3000);
-      // Stop polling after 2 minutes
-      setTimeout(() => clearInterval(interval), 120000);
+      const prods = await api.getProducts();
+      setProducts(prods);
+      if (prods.length === 0) {
+        alert("No products found. Add products before generating.");
+        return;
+      }
+      setSelectedProductIds(new Set(prods.map((p) => p.id)));
+      setShowProductModal(true);
+    } catch {
+      alert("Failed to load products.");
+    }
+  };
+
+  const toggleProduct = (id: number) => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleStartGeneration = async () => {
+    if (selectedProductIds.size === 0) return;
+    setShowProductModal(false);
+    setGenerating(true);
+
+    try {
+      await api.runDiscovery(Array.from(selectedProductIds));
+      // Re-fetch runs to show the new one
+      fetchRuns();
     } catch (err) {
       console.error("Discovery failed:", err);
-    } finally {
       setGenerating(false);
     }
   };
 
-  const filtered = leads.filter((l) => {
-    const matchesSearch = l.company_name.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === "all" || l.enrichment_status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
   return (
-    <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
+    <div className="w-full flex flex-col gap-8">
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
-            Leads &amp; Enrichment
+            Generation Runs
           </h1>
           <p className="text-slate-500 mt-1 text-sm">
-            Track enrichment status and leads.
+            Each run discovers prospects matched to your selected products.
           </p>
         </div>
-        <div className="flex gap-3">
-          <div className="relative">
-            <button 
-              onClick={() => setShowFilters(!showFilters)}
-              className={`bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2 ${showFilters ? 'bg-slate-50 border-slate-300' : ''}`}
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                filter_list
-              </span>
-              Filter
-              {statusFilter !== "all" && (
-                <span className="w-2 h-2 bg-primary rounded-full"></span>
-              )}
-            </button>
-            {showFilters && (
-              <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-lg shadow-lg z-10 py-1">
-                <button
-                  onClick={() => { setStatusFilter("all"); setShowFilters(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "all" ? "bg-slate-100 font-medium" : ""}`}
-                >
-                  All Status
-                </button>
-                <button
-                  onClick={() => { setStatusFilter("pending"); setShowFilters(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "pending" ? "bg-slate-100 font-medium" : ""}`}
-                >
-                  Pending
-                </button>
-                <button
-                  onClick={() => { setStatusFilter("in_progress"); setShowFilters(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "in_progress" ? "bg-slate-100 font-medium" : ""}`}
-                >
-                  In Progress
-                </button>
-                <button
-                  onClick={() => { setStatusFilter("complete"); setShowFilters(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "complete" ? "bg-slate-100 font-medium" : ""}`}
-                >
-                  Complete
-                </button>
-                <button
-                  onClick={() => { setStatusFilter("failed"); setShowFilters(false); }}
-                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 ${statusFilter === "failed" ? "bg-slate-100 font-medium" : ""}`}
-                >
-                  Failed
-                </button>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
-          >
-            <span
-              className={`material-symbols-outlined text-[18px] ${generating ? "animate-spin" : ""}`}
-            >
-              {generating ? "progress_activity" : "bolt"}
-            </span>
-            {generating ? "Generating..." : "Generate"}
-          </button>
-        </div>
+        <button
+          onClick={handleGenerateClick}
+          disabled={generating}
+          className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
+        >
+          <span className="material-symbols-outlined text-[18px]">
+            {generating ? "hourglass_empty" : "bolt"}
+          </span>
+          {generating ? "Generating..." : "New Generation"}
+        </button>
       </div>
 
-      {/* Search bar */}
-      <div className="bg-white p-1 rounded-lg border border-slate-200 shadow-sm flex flex-col lg:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full lg:w-96">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <span className="material-symbols-outlined text-slate-400 text-[20px]">
-              search
-            </span>
+      {/* Generating banner */}
+      {generating && (
+        <div className="flex items-center gap-4 bg-slate-900 text-white px-5 py-4 rounded-lg animate-fadeIn">
+          <div className="size-10 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-[22px]">psychology</span>
           </div>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border-0 bg-transparent text-slate-900 placeholder-slate-400 focus:ring-0 sm:text-sm"
-            placeholder="Search companies..."
-          />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">{discoveryPhase || "AI Discovery Agent Running"}</p>
+            <p className="text-xs text-slate-400 mt-1">{discoveryProgress || "Searching for matching companies and enriching data..."}</p>
+          </div>
         </div>
-        <div className="flex items-center gap-2 w-full lg:w-auto">
-          {statusFilter !== "all" && (
-            <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
-              Status: {statusFilter.replace("_", " ")}
-              <button onClick={() => setStatusFilter("all")} className="ml-1 hover:text-slate-700">×</button>
-            </span>
-          )}
-        </div>
-      </div>
+      )}
 
-      {/* Table */}
+      {/* Runs list */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-100">
             <thead>
               <tr>
-                {[
-                  "Company Name",
-                  "Industry",
-                  "Employees",
-                  "Revenue",
-                  "Status",
-                  "Assets",
-                ].map((h, i) => (
+                {["Date", "Products", "Params", "Prospects Found", "Status", ""].map((h) => (
                   <th
                     key={h}
-                    className={`px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide ${i === 0 ? "w-[25%]" : ""}`}
+                    className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide"
                   >
                     {h}
                   </th>
                 ))}
-                <th className="relative px-6 py-4">
-                  <span className="sr-only">Actions</span>
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-6 py-8 text-center text-slate-500"
-                  >
-                    Loading leads...
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                    Loading...
                   </td>
                 </tr>
-              ) : filtered.length === 0 ? (
+              ) : runs.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={8}
-                    className="px-6 py-8 text-center text-slate-500"
-                  >
-                    No leads yet. Press generate to get started.
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <span className="material-symbols-outlined text-[40px] text-slate-300">
+                        search
+                      </span>
+                      <p className="text-slate-500 text-sm">No generation runs yet.</p>
+                      <p className="text-slate-400 text-xs">Click &quot;New Generation&quot; to discover prospects.</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filtered.map((lead, idx) => (
+                runs.map((run) => (
                   <tr
-                    key={lead.id}
-                    onClick={() => onSelectLead(lead.id)}
+                    key={run.id}
+                    onClick={() => onSelectRun(run.id)}
                     className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                   >
-                    <td className="px-6 py-3.5">
-                      <div className="flex items-center">
-                        {lead.company_url ? (
-                          <img
-                            src={`https://www.google.com/s2/favicons?domain=${lead.company_url}&sz=64`}
-                            alt=""
-                            className="flex-shrink-0 h-8 w-8 rounded bg-slate-100 border border-slate-200"
-                          />
-                        ) : (
-                          <div className="flex-shrink-0 h-8 w-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-500">
-                            <span className="material-symbols-outlined text-[18px]">
-                              {ROW_ICONS[idx % ROW_ICONS.length]}
-                            </span>
-                          </div>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-slate-900">
+                        {new Date(run.created_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {timeAgo(run.created_at)}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {run.product_names.map((name, i) => (
+                          <span
+                            key={i}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700"
+                          >
+                            {name}
+                          </span>
+                        ))}
+                        {run.product_snapshots && run.product_snapshots.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setViewingSnapshot(run);
+                            }}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-200 text-slate-600 hover:bg-slate-300 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-[12px] mr-1">info</span>
+                            View
+                          </button>
                         )}
-                        <div className="ml-3">
-                          <div className="text-sm font-medium text-slate-900">
-                            {lead.company_name}
-                          </div>
-                          <div className="text-xs text-slate-400 mt-0.5">
-                            {lead.company_url || "N/A"}
-                          </div>
-                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap text-sm text-slate-500">
-                      {lead.industry || "-"}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-xs text-slate-500">
+                        Max: {run.max_companies}
+                      </span>
                     </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap text-sm text-slate-500">
-                      {empRange(lead.employees)}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-medium text-slate-900">
+                        {run.lead_count}
+                      </span>
                     </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap text-sm text-slate-500">
-                      {lead.revenue || "-"}
-                    </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <div
-                          className={`w-1.5 h-1.5 rounded-full ${statusDot(lead.enrichment_status)}`}
-                        />
+                        <div className={`w-1.5 h-1.5 rounded-full ${statusDot(run.status)}`} />
                         <span className="text-xs font-medium text-slate-600">
-                          {statusLabel(lead.enrichment_status)}
+                          {statusLabel(run.status)}
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                        <span
-                          className={`material-symbols-outlined text-[16px] ${lead.pitch_deck_generated ? "text-slate-800" : "text-slate-300"}`}
-                          title={
-                            lead.pitch_deck_generated
-                              ? "Pitch Deck Generated"
-                              : "Pending"
-                          }
-                        >
-                          slideshow
-                        </span>
-                        <span
-                          className={`material-symbols-outlined text-[16px] ${lead.email_generated ? "text-slate-800" : "text-slate-300"}`}
-                          title={
-                            lead.email_generated ? "Email Generated" : "Pending"
-                          }
-                        >
-                          mail
-                        </span>
-                        <span
-                          className="material-symbols-outlined text-[16px] text-slate-300"
-                          title="Pending"
-                        >
-                          mic
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-slate-300 hover:text-slate-600 transition-colors">
-                        <span className="material-symbols-outlined text-[18px]">
-                          more_horiz
-                        </span>
-                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <span className="material-symbols-outlined text-[18px] text-slate-300 group-hover:text-slate-500 transition-colors">
+                        chevron_right
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -448,39 +279,178 @@ export default function Dashboard({ onSelectLead }: DashboardProps) {
             </tbody>
           </table>
         </div>
+      </div>
 
-        {/* Pagination */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-slate-200 sm:px-6">
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-            <p className="text-sm text-slate-500">
-              Showing <span className="font-medium text-slate-700">1</span> to{" "}
-              <span className="font-medium text-slate-700">
-                {filtered.length}
-              </span>{" "}
-              of{" "}
-              <span className="font-medium text-slate-700">
-                {filtered.length}
-              </span>{" "}
-              results
-            </p>
-            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-              <button className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-slate-200 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50">
-                <span className="material-symbols-outlined text-[18px]">
-                  chevron_left
-                </span>
+      {/* Product Selection Modal */}
+      {showProductModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Select Products
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">
+                Choose which products to find prospects for.
+              </p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-2">
+                {products.map((product) => (
+                  <label
+                    key={product.id}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                      selectedProductIds.has(product.id)
+                        ? "border-slate-800 bg-slate-50"
+                        : "border-slate-200 hover:border-slate-300"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedProductIds.has(product.id)}
+                      onChange={() => toggleProduct(product.id)}
+                      className="mt-0.5 rounded border-slate-300 text-slate-800 focus:ring-slate-800"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-slate-900">
+                        {product.name}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5 line-clamp-2">
+                        {product.description}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+              <button
+                onClick={() => {
+                  if (selectedProductIds.size === products.length) {
+                    setSelectedProductIds(new Set());
+                  } else {
+                    setSelectedProductIds(new Set(products.map((p) => p.id)));
+                  }
+                }}
+                className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+              >
+                {selectedProductIds.size === products.length ? "Deselect all" : "Select all"}
               </button>
-              <button className="z-10 bg-slate-100 border-slate-200 text-slate-700 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
-                1
-              </button>
-              <button className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-slate-200 bg-white text-sm font-medium text-slate-500 hover:bg-slate-50">
-                <span className="material-symbols-outlined text-[18px]">
-                  chevron_right
-                </span>
-              </button>
-            </nav>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowProductModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleStartGeneration}
+                  disabled={selectedProductIds.size === 0}
+                  className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all disabled:opacity-50"
+                >
+                  Generate for {selectedProductIds.size} product{selectedProductIds.size !== 1 ? "s" : ""}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Product Snapshot Modal */}
+      {viewingSnapshot && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Product Snapshots
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  Showing product data at time of run on {new Date(viewingSnapshot.created_at).toLocaleDateString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingSnapshot(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <div className="space-y-6">
+                {viewingSnapshot.product_snapshots?.map((snapshot, i) => (
+                  <div key={i} className="border border-slate-200 rounded-lg p-4">
+                    <h3 className="text-base font-semibold text-slate-900">{snapshot.name}</h3>
+                    <div className="mt-3 space-y-2 text-sm">
+                      {snapshot.description && (
+                        <div>
+                          <span className="text-slate-500">Description:</span>
+                          <p className="text-slate-700 mt-1">{snapshot.description}</p>
+                        </div>
+                      )}
+                      {snapshot.features && snapshot.features.length > 0 && (
+                        <div>
+                          <span className="text-slate-500">Features:</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {snapshot.features.map((f, j) => (
+                              <span key={j} className="px-2 py-0.5 bg-slate-100 rounded text-xs text-slate-600">
+                                {f}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="grid grid-cols-2 gap-2">
+                        {snapshot.industry_focus && (
+                          <div>
+                            <span className="text-slate-500">Industry:</span>
+                            <span className="text-slate-700 ml-1">{snapshot.industry_focus}</span>
+                          </div>
+                        )}
+                        {snapshot.pricing_model && (
+                          <div>
+                            <span className="text-slate-500">Pricing:</span>
+                            <span className="text-slate-700 ml-1">{snapshot.pricing_model}</span>
+                          </div>
+                        )}
+                        {snapshot.company_size_target && (
+                          <div>
+                            <span className="text-slate-500">Target Size:</span>
+                            <span className="text-slate-700 ml-1">{snapshot.company_size_target}</span>
+                          </div>
+                        )}
+                        {snapshot.geography && (
+                          <div>
+                            <span className="text-slate-500">Geography:</span>
+                            <span className="text-slate-700 ml-1">{snapshot.geography}</span>
+                          </div>
+                        )}
+                        {snapshot.stage && (
+                          <div>
+                            <span className="text-slate-500">Stage:</span>
+                            <span className="text-slate-700 ml-1">{snapshot.stage}</span>
+                          </div>
+                        )}
+                        {snapshot.differentiator && (
+                          <div className="col-span-2">
+                            <span className="text-slate-500">Differentiator:</span>
+                            <p className="text-slate-700">{snapshot.differentiator}</p>
+                          </div>
+                        )}
+                        {snapshot.example_clients && snapshot.example_clients.length > 0 && (
+                          <div className="col-span-2">
+                            <span className="text-slate-500">Example Clients:</span>
+                            <span className="text-slate-700 ml-1">{snapshot.example_clients.join(", ")}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

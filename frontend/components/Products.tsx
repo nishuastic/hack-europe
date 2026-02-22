@@ -7,24 +7,6 @@ interface ProductsProps {
   onEdit: (productId?: number) => void;
 }
 
-const DEMO_PRODUCTS: Product[] = [
-  {
-    id: 1,
-    name: "ChurnPredict",
-    description:
-      "AI-powered analytics dashboard that predicts which customers are likely to cancel.",
-    features: ["Real-time usage tracking", "Automated email triggers"],
-    differentiator: "94% accuracy in predicting churn",
-  },
-  {
-    id: 2,
-    name: "RetainFlow",
-    description: "Enterprise retention workflow automation platform.",
-    features: ["Custom workflows", "CRM integration"],
-    differentiator: "End-to-end retention pipeline",
-  },
-];
-
 export default function Products({ onEdit }: ProductsProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,12 +15,12 @@ export default function Products({ onEdit }: ProductsProps) {
     api
       .getProducts()
       .then(setProducts)
-      .catch(() => setProducts(DEMO_PRODUCTS))
+      .catch((err) => console.error("Failed to load products:", err))
       .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col gap-8 pb-10">
+    <div className="w-full flex flex-col gap-8 pb-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>

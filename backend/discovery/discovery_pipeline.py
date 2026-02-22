@@ -9,7 +9,7 @@ from sqlmodel import select
 from backend.db import async_session
 from backend.discovery.icp_agent import run_discovery_agent
 from backend.enrichment.pipeline import enrich_leads
-from backend.models import EnrichmentStatus, Lead, Product
+from backend.models import CompanyProfile, EnrichmentStatus, GenerationRun, Lead, Product
 
 logger = logging.getLogger(__name__)
 
@@ -19,20 +19,16 @@ async def run_discovery(
     max_companies: int,
     ws_manager: Any,
     user_id: int,
+    generation_run_id: int | None = None,
 ) -> None:
     """Full discovery pipeline: load products -> run agent -> create leads -> enrich.
 
     Runs as a background task (fire-and-forget from the API endpoint).
     """
     async with async_session() as session:
-        # Load products
-        if product_ids:
-            result = await session.execute(
-                select(Product).where(Product.id.in_(product_ids), Product.user_id == user_id)  # type: ignore[union-attr]
-            )
-        else:
-            result = await session.execute(select(Product).where(Product.user_id == user_id))
-        products = list(result.scalars().all())
+        # Always load all user products for full catalog context
+        all_result = await session.execute(select(Product).where(Product.user_id == user_id))
+        products = list(all_result.scalars().all())
 
         if not products:
             logger.error("No products found for discovery")
@@ -42,16 +38,39 @@ async def run_discovery(
             })
             return
 
+        # Derive selected_products from product_ids filter
+        selected_products: list[Product] | None = None
+        if product_ids:
+            pid_set = set(product_ids)
+            selected_products = [p for p in products if p.id in pid_set]
+            if not selected_products:
+                logger.error("No matching products found for given product_ids")
+                await ws_manager.broadcast({
+                    "type": "discovery_error",
+                    "error": "No matching products found for the selected IDs.",
+                })
+                return
+
+        # Load seller company profile (optional)
+        cp_result = await session.execute(select(CompanyProfile))
+        company_profile = cp_result.scalar_one_or_none()
+
     # Broadcast start
+    active_count = len(selected_products) if selected_products else len(products)
     await ws_manager.broadcast({
         "type": "discovery_start",
-        "product_count": len(products),
+        "product_count": active_count,
         "max_companies": max_companies,
     })
 
     try:
         # Run the ICP discovery agent
-        discovered = await run_discovery_agent(products, max_companies, ws_manager)
+        discovered = await run_discovery_agent(
+            products, max_companies,
+            selected_products=selected_products,
+            ws_manager=ws_manager,
+            company_profile=company_profile,
+        )
 
         if not discovered:
             logger.warning("Discovery agent returned no companies")
@@ -90,6 +109,7 @@ async def run_discovery(
                     revenue=company.get("revenue"),
                     employees=company.get("employees"),
                     enrichment_status=EnrichmentStatus.PENDING,
+                    generation_run_id=generation_run_id,
                 )
                 session.add(lead)
                 await session.commit()
@@ -105,11 +125,24 @@ async def run_discovery(
                     "why_good_fit": company.get("why_good_fit", ""),
                 })
 
+        # Update GenerationRun on completion
+        if generation_run_id:
+            async with async_session() as session:
+                run = (await session.execute(
+                    select(GenerationRun).where(GenerationRun.id == generation_run_id)
+                )).scalar_one_or_none()
+                if run:
+                    run.lead_count = len(lead_ids)
+                    run.status = "complete"
+                    session.add(run)
+                    await session.commit()
+
         # Broadcast completion
         await ws_manager.broadcast({
             "type": "discovery_complete",
             "companies_found": len(lead_ids),
             "lead_ids": lead_ids,
+            "generation_run_id": generation_run_id,
         })
 
         # Auto-enrich discovered leads
@@ -119,6 +152,19 @@ async def run_discovery(
 
     except Exception as e:
         logger.exception("Discovery pipeline failed")
+        # Update GenerationRun on failure
+        if generation_run_id:
+            try:
+                async with async_session() as session:
+                    run = (await session.execute(
+                        select(GenerationRun).where(GenerationRun.id == generation_run_id)
+                    )).scalar_one_or_none()
+                    if run:
+                        run.status = "failed"
+                        session.add(run)
+                        await session.commit()
+            except Exception:
+                logger.exception("Failed to update GenerationRun status")
         await ws_manager.broadcast({
             "type": "discovery_error",
             "error": str(e),

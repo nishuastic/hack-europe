@@ -9,7 +9,7 @@ Backend:  Python 3.12 + FastAPI (managed by uv)
 Frontend: Next.js + TypeScript + AG Grid (managed by bun)
 DB:       SQLite via SQLModel
 Realtime: WebSocket (enrichment + matching streams live to cells)
-AI:       Claude (reasoning/generation) + ElevenLabs (voice briefings)
+AI:       Claude (reasoning/generation)
 Search:   LinkUp SDK (web research)
 Billing:  Stripe (usage-based)
 ```
@@ -158,7 +158,6 @@ WS     /ws/updates                  # Real-time updates
 
 ### Not yet implemented
 ```
-POST   /api/leads/{id}/voice        # ElevenLabs voice briefing (Phase 3)
 POST   /api/billing/checkout        # Stripe checkout (Phase 3)
 GET    /api/billing/credits          # Remaining credits (Phase 3)
 ```
@@ -205,4 +204,3 @@ Match update:
 | Best Use of Claude ($10k credits) | Core reasoning: query planning, extraction, ICP discovery, matching, deck gen |
 | Best Stripe Integration (€3k) | Usage-based billing, pay-per-enrichment/deck |
 | Autonomous Consulting Agent | Discovery agent acts like a senior SDR/consultant |
-| Best Use of ElevenLabs (AirPods) | Voice call-prep briefing per lead |

@@ -8,6 +8,7 @@ import LandingPage from "@/components/LandingPage";
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import Dashboard from "@/components/Dashboard";
+import GenerationRunDetail from "@/components/GenerationRunDetail";
 import LeadDetail from "@/components/LeadDetail";
 import PitchDeckEditor from "@/components/PitchDeckEditor";
 import Onboard from "@/components/Onboard";
@@ -54,6 +55,7 @@ export default function Home() {
     return (
       <PitchDeckEditor
         leadId={view.leadId}
+        productId={view.productId}
         onBack={() => goTo({ page: "lead-detail", leadId: view.leadId })}
       />
     );
@@ -68,7 +70,20 @@ export default function Home() {
           {view.page === "dashboard" && (
             <div className="p-8">
               <Dashboard
-                onSelectLead={(id) => goTo({ page: "lead-detail", leadId: id })}
+                onSelectRun={(id) =>
+                  goTo({ page: "generation-run-detail", runId: id })
+                }
+              />
+            </div>
+          )}
+          {view.page === "generation-run-detail" && (
+            <div className="p-8">
+              <GenerationRunDetail
+                runId={view.runId}
+                onBack={() => goTo({ page: "dashboard" })}
+                onSelectLead={(id) =>
+                  goTo({ page: "lead-detail", leadId: id })
+                }
               />
             </div>
           )}

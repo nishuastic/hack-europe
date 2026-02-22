@@ -25,7 +25,7 @@ def test_search_query_to_dict():
 def test_search_plan_len_and_texts():
     queries = [
         SearchQuery("q1", "standard", "description", "r1"),
-        SearchQuery("q2", "deep", "funding", "r2"),
+        SearchQuery("q2", "standard", "funding", "r2"),
     ]
     plan = SearchPlan(queries=queries)
     assert len(plan) == 2
@@ -38,7 +38,7 @@ def test_parse_plan_response_with_queries_key():
     raw = json.dumps({
         "queries": [
             {"query": "Stripe overview", "depth": "standard", "target_field": "description", "rationale": "overview"},
-            {"query": "Stripe funding", "depth": "deep", "target_field": "funding", "rationale": "funding info"},
+            {"query": "Stripe funding", "depth": "standard", "target_field": "funding", "rationale": "funding info"},
         ]
     })
     result = _parse_plan_response(raw)
@@ -78,7 +78,7 @@ async def test_plan_queries_calls_claude():
          "target_field": "description", "rationale": "Get overview"},
         {"query": "Stripe funding", "depth": "standard",
          "target_field": "funding", "rationale": "Funding info"},
-        {"query": "Stripe leadership", "depth": "deep",
+        {"query": "Stripe leadership", "depth": "standard",
          "target_field": "contacts", "rationale": "Find leaders"},
     ]})
     mock_response.content = [mock_content]
@@ -92,7 +92,7 @@ async def test_plan_queries_calls_claude():
     assert isinstance(plan, SearchPlan)
     assert len(plan) == 3
     assert plan.queries[0].target_field == "description"
-    assert plan.queries[2].depth == "deep"
+    assert plan.queries[2].depth == "standard"
 
     mock_client.messages.create.assert_called_once()
 
@@ -103,9 +103,9 @@ async def test_plan_queries_follow_up():
     mock_response = MagicMock()
     mock_content = MagicMock()
     mock_content.text = json.dumps({"queries": [
-        {"query": "Stripe key contacts", "depth": "deep",
+        {"query": "Stripe key contacts", "depth": "standard",
          "target_field": "contacts", "rationale": "Fill gap"},
-        {"query": "Stripe buying signals", "depth": "deep",
+        {"query": "Stripe buying signals", "depth": "standard",
          "target_field": "buying_signals", "rationale": "Fill gap"},
     ]})
     mock_response.content = [mock_content]

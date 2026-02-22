@@ -38,7 +38,6 @@ Enriched Lead → Product Matching → Pitch Deck
 | Realtime | WebSocket (live cell updates) |
 | AI | Claude (reasoning/extraction/generation) |
 | Search | LinkUp SDK (web research) |
-| Voice | ElevenLabs (call-prep briefings) |
 | Billing | Stripe (usage-based) |
 
 ## Prerequisites
@@ -161,7 +160,6 @@ hack-europe/
 |----------|----------|-------------|
 | `ANTHROPIC_API_KEY` | Yes | Claude API key for AI extraction + generation |
 | `LINKUP_API_KEY` | Yes | LinkUp API key for web research |
-| `ELEVENLABS_API_KEY` | Later | ElevenLabs key for voice briefings |
 | `STRIPE_API_KEY` | Later | Stripe test key for billing |
 
 ## Architecture

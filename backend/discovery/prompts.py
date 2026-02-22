@@ -6,11 +6,25 @@ from typing import Any
 from backend.models import Product
 
 
-def build_discovery_prompt(products: list[Product]) -> str:
-    """Build the system prompt that instructs Claude to derive ICPs and search for companies."""
+def build_discovery_prompt(
+    products: list[Product],
+    selected_products: list[Product] | None = None,
+) -> str:
+    """Build the system prompt that instructs Claude to derive ICPs and search for companies.
+
+    Args:
+        products: Full product catalog (used as fallback if selected_products is not provided).
+        selected_products: Subset of products to generate search queries for. If provided,
+            only these products will be included in the prompt.
+    """
+    active_products = selected_products if selected_products is not None else products
+
     product_descriptions = []
-    for i, p in enumerate(products, 1):
+    for i, p in enumerate(active_products, 1):
         parts = [f"### Product {i}: {p.name}"]
+        # Embed the product ID so Claude can tag each query back to its product
+        if p.id is not None:
+            parts.append(f"**Product ID:** {p.id}")
         parts.append(f"**Description:** {p.description}")
         if p.features:
             parts.append(f"**Features:** {', '.join(p.features)}")
@@ -28,6 +42,9 @@ def build_discovery_prompt(products: list[Product]) -> str:
             parts.append(f"**Differentiator:** {p.differentiator}")
         if p.example_clients:
             parts.append(f"**Example clients:** {', '.join(p.example_clients)}")
+        if p.current_clients:
+            client_names = [c["name"] if isinstance(c, dict) else str(c) for c in p.current_clients]
+            parts.append(f"**Current clients:** {', '.join(client_names)}")
         if p.company_name:
             parts.append(f"**Selling company:** {p.company_name}")
         if p.website:
@@ -46,37 +63,48 @@ would be ideal customers for the products below.
 
 ## Your Task
 
-1. **Derive Ideal Customer Profiles (ICPs):** Analyze the products above and determine \
-what types of companies would benefit most from each product. Consider industry, company \
-size, stage, geography, pain points, and technology usage.
+1. **Derive Ideal Customer Profiles (ICPs):** Analyze the vendor/product profile(s) above \
+describing what they sell, who they sell to, what problems they solve, \
+and what makes them different.
 
-2. **Search for matching companies:** Use the `search_companies` tool to find real \
-companies matching each ICP. Generate specific, targeted search queries — e.g. \
+   Rules:
+   - Use the product details as the ONLY source of truth. Do not assume or invent any constraints.
+   - If a detail is not present, do not include it.
+
+   Output format (IMPORTANT):
+   - Return exactly TWO paragraphs of plain text per product.
+   - Paragraph 1: 1–2 sentence summary of the vendor and its offering.
+   - Paragraph 2: The Ideal Customer Profile (ICP) in 3–6 sentences, explicitly covering:
+     - Target industries (if specified)
+     - Geography served (if specified)
+     - Company size/stage (if specified)
+     - Primary buyer roles/titles (if specified)
+     - The problems/pains they likely have (based only on the offering description)
+     - Key success outcome they want (based only on the offering description)
+
+
+2. **Generate targeted search queries:** For each product's ICP, generate 2-4 web search \
+queries that would find real companies matching that profile. Be specific and creative — e.g. \
 "Series B fintech startups in Europe", "mid-market SaaS companies hiring for data engineering", \
 "healthcare companies using legacy ERP systems".
 
-3. **Validate promising companies:** For companies that look like good fits, use \
-`fetch_company_website` to read their website and `get_company_details` to extract \
-structured information. This helps you confirm they're a real match, not just a name.
-
-4. **Iterate for coverage:** If you haven't found enough companies, try different ICP \
-angles, industries, geographies, or search strategies. The `search_companies` tool will \
-automatically exclude companies you've already found.
-
-5. **Submit results:** When you have enough companies (or have exhausted search strategies), \
-call `submit_discovered_companies` with your final list.
-
 ## Rules
 
-- Only submit companies you found via actual search results. NEVER hallucinate or make up \
-company names.
-- Include a `why_good_fit` explanation for every company, referencing specific product \
-features and company characteristics.
-- Aim for diversity: mix of company sizes, sub-industries, and geographies (where applicable).
-- For each company, try to get at least: name, URL, description, and industry. Funding, \
-revenue, and employee count are valuable bonuses.
-- If a search returns no useful results, try rephrasing or a different ICP angle.
-- Do NOT submit the selling company itself as a lead.
+- Aim for diversity: vary company sizes, sub-industries, geographies, and search angles.
+- Always use "standard" depth.
+- Include a brief `icp_rationale` for each query explaining what ICP it targets.
+- Each query MUST include a `product_id` field matching the Product ID shown above.
+- Do NOT include the selling company itself as a target.
+
+## Output Format
+
+Return ONLY a JSON object (no markdown, no explanation outside the JSON):
+```json
+{{"queries": [
+  {{"query": "...", "depth": "standard", "icp_rationale": "...", "product_id": 1}},
+  ...
+]}}
+```
 """
 
 
@@ -120,6 +148,10 @@ the best {max_companies} that would be ideal customers for the products below.
 {products_block}
 
 ## Candidate Companies (from web search)
+Each candidate includes `matched_product_ids` (list) indicating which products' search \
+queries surfaced it. Use this as a strong signal for `best_product_matches`, but you may \
+override if different products are clearly a better fit.
+
 {candidates_json}
 
 ## Instructions
@@ -134,6 +166,6 @@ Each object in the array must have:
 - "description": string (what the company does)
 - "industry": string
 - "why_good_fit": string (reference specific product features and company characteristics)
-- "best_product_match": string (name of the best-matching product)
+- "best_product_matches": list of strings (names of matching products, ordered by best fit)
 
 Return the JSON array now:"""

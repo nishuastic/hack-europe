@@ -89,14 +89,13 @@ msg.type === 'prediction_update'     // Update conversion column
 - [ ] `lib/api.ts` — API client + WebSocket connection
 
 ### Phase 2 — Actions + Deck Viewer + Analytics
-- [ ] `components/ActionPanel.tsx` — slide-in panel when row clicked (deck, email, voice)
+- [ ] `components/ActionPanel.tsx` — slide-in panel when row clicked (deck, email)
 - [ ] `components/PitchDeckViewer.tsx` — HTML slide viewer + PPTX download
 - [ ] `components/EmailPreview.tsx` — generated email + copy button
 - [ ] `components/AnalyticsDashboard.tsx` — charts: industry breakdown, score distribution, top opportunities
 
 ### Phase 3 — Prize Features
 - [ ] `components/AgentThinking.tsx` — discovery/enrichment reasoning display
-- [ ] Audio player for voice briefings
 - [ ] Stripe credits in header + checkout flow
 - [ ] Auth: login/register screens, token storage
 
@@ -136,7 +135,7 @@ User clicks row in grid
   → Shows best-matched product with score + reasoning
   → Option to select different product from matches dropdown
   → Three action buttons:
-    [Generate Pitch Deck]  [Draft Email]  [Voice Briefing]
+    [Generate Pitch Deck]  [Draft Email]
   → Clicking "Generate Pitch Deck":
     - Uses the selected/best-matched product_id
     - Shows loading animation
@@ -226,7 +225,6 @@ if (msg.type === 'prediction_update') {
 
 ### Person C
 - [ ] `components/AgentThinking.tsx` — shows agent reasoning steps (stream from WS)
-- [ ] Audio player in ActionPanel for ElevenLabs voice briefings
 - [ ] Stripe credits display in header bar
 - [ ] Stripe checkout integration (redirect to Stripe, handle return)
 
@@ -264,7 +262,7 @@ This is key for "Adaptable Agent" prize — visibly shows the agent changing its
 - [ ] Dark mode (toggle or default dark)
 - [ ] Loading skeletons for cells (not just spinners)
 - [ ] Smooth animations (slide panel, cell population)
-- [ ] "Powered by" footer: Claude, LinkUp, Stripe, ElevenLabs logos
+- [ ] "Powered by" footer: Claude, LinkUp, Stripe logos
 - [ ] Responsive (just don't break on smaller screens)
 
 ### Person D
@@ -289,7 +287,6 @@ This is key for "Adaptable Agent" prize — visibly shows the agent changing its
 1:00 — Click top lead → see matched product + score + reasoning
 1:10 — Generate 7-slide pitch deck for that product-company pair
 1:30 — Download PPTX + show drafted email
-1:40 — Play voice briefing
-1:50 — Show Stripe credits
+1:40 — Show Stripe credits
 2:00 — "Stick: your AI sales team. Multiple products, perfect matches, personalized pitches."
 ```
