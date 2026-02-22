@@ -20,7 +20,7 @@ export default function Products({ onEdit }: ProductsProps) {
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col gap-8 pb-10">
+    <div className="w-full flex flex-col gap-8 pb-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>

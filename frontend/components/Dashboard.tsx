@@ -136,7 +136,7 @@ export default function Dashboard({ onSelectRun }: DashboardProps) {
   };
 
   return (
-    <div className="max-w-[1600px] mx-auto flex flex-col gap-8">
+    <div className="w-full flex flex-col gap-8">
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>

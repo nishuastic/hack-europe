@@ -14,7 +14,6 @@ import PitchDeckEditor from "@/components/PitchDeckEditor";
 import Onboard from "@/components/Onboard";
 import Products from "@/components/Products";
 import ProductEdit from "@/components/ProductEdit";
-import LinkedInImport from "@/components/LinkedInImport";
 
 export default function Home() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -108,17 +107,12 @@ export default function Home() {
               />
             </div>
           )}
-          {view.page === "linkedin-import" && (
-            <div className="p-6 md:p-10">
-              <LinkedInImport />
-            </div>
-          )}
           {view.page === "lead-detail" && (
             <LeadDetail
               leadId={view.leadId}
               onBack={() => goTo({ page: "dashboard" })}
-              onOpenPitchEditor={(productId?: number) =>
-                goTo({ page: "pitch-editor", leadId: view.leadId, productId })
+              onOpenPitchEditor={() =>
+                goTo({ page: "pitch-editor", leadId: view.leadId })
               }
             />
           )}
