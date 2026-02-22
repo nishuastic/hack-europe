@@ -177,9 +177,14 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 aria-label="Stick logo"
               />
             </div>
-            <span className="text-5xl font-semibold tracking-tight text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>
-              Stick
-            </span>
+            <div className="flex flex-col">
+              <span className="text-5xl font-semibold tracking-tight text-slate-900 leading-none" style={{ fontFamily: "'Playfair Display', serif" }}>
+                Stick
+              </span>
+              <span className="text-xs font-medium tracking-wide text-slate-500" style={{ fontFamily: "'Playfair Display', serif" }}>
+                Better fetch them all
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <a
@@ -639,9 +644,12 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* CTA */}
       <section className="py-16 px-6">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
+          <h2 className="text-6xl sm:text-7xl font-bold tracking-tight text-slate-900" style={{ fontFamily: "'Cormorant Garamond', serif" }}>
             Stop searching. Start selling.
           </h2>
+          <p className="text-3xl sm:text-4xl font-medium tracking-wide text-slate-400 mt-3" style={{ fontFamily: "'Playfair Display', serif" }}>
+            Better fetch them all
+          </p>
           <p className="mt-3 text-slate-500 max-w-xl mx-auto">
             Stick is your AI sales team — it discovers, researches, matches,
             and pitches. All you have to do is close.
