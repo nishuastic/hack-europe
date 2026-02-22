@@ -52,8 +52,10 @@ async def run_discovery(
                 return
 
         # Load seller company profile (optional)
-        cp_result = await session.execute(select(CompanyProfile))
-        company_profile = cp_result.scalar_one_or_none()
+        cp_result = await session.execute(
+            select(CompanyProfile).where(CompanyProfile.user_id == user_id)
+        )
+        company_profile = cp_result.scalars().first()
 
     # Broadcast start
     active_count = len(selected_products) if selected_products else len(products)
