@@ -30,6 +30,7 @@ CREDIT_COSTS: dict[UsageEventType, int] = {
     UsageEventType.MATCHING: 2,      # 2 SC — AI product-to-lead matching
     UsageEventType.PITCH_DECK: 10,   # 10 SC — 7-slide personalized deck
     UsageEventType.EMAIL: 1,         # 1 SC — personalized outreach email
+    UsageEventType.LINKEDIN_OUTREACH: 0,  # Free — warm intro outreach plan
 }
 
 # ─── Tier plans (monthly subscriptions) ──────────────────────────────
@@ -176,6 +177,7 @@ def _emit_signal(event_type: UsageEventType, credits: UserCredits, metadata: dic
         UsageEventType.MATCHING: "matching",
         UsageEventType.PITCH_DECK: "pitch_deck_generation",
         UsageEventType.EMAIL: "email_generation",
+        UsageEventType.LINKEDIN_OUTREACH: "linkedin_outreach",
     }
 
     try:

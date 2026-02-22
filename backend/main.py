@@ -6,7 +6,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -41,6 +41,8 @@ from backend.models import (
     GeneratedEmail,
     GenerationRun,
     Lead,
+    LinkedInConnection,
+    LinkedInMatch,
     PitchDeck,
     Product,
     ProductMatch,
@@ -715,6 +717,130 @@ async def create_email(
     await session.refresh(email_record)
 
     return email_record
+
+
+# ─── LinkedIn Import ──────────────────────────────────────────────────
+
+
+@app.post("/api/linkedin/import")
+async def import_linkedin(
+    file: UploadFile,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Upload a LinkedIn data export (ZIP or CSV) and start the import pipeline."""
+    from backend.db import async_session as session_factory
+    from backend.linkedin.csv_parser import parse_connections_csv, parse_linkedin_zip
+    from backend.linkedin.pipeline import process_linkedin_import
+
+    assert user.id is not None
+    content = await file.read()
+    filename = (file.filename or "").lower()
+
+    if filename.endswith(".zip"):
+        connections = parse_linkedin_zip(content)
+    elif filename.endswith(".csv"):
+        connections = parse_connections_csv(content.decode("utf-8-sig"))
+    else:
+        raise HTTPException(status_code=400, detail="File must be .zip or .csv")
+
+    if not connections:
+        raise HTTPException(status_code=400, detail="No connections found in file")
+
+    asyncio.create_task(process_linkedin_import(user.id, connections, manager, session_factory))
+    return {"status": "import_started", "connections_found": len(connections)}
+
+
+@app.post("/api/linkedin/demo")
+async def import_linkedin_demo(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Import mock LinkedIn data for demo purposes."""
+    from backend.db import async_session as session_factory
+    from backend.linkedin.csv_parser import parse_connections_csv
+    from backend.linkedin.mock_data import generate_mock_csv_text
+    from backend.linkedin.pipeline import process_linkedin_import
+
+    assert user.id is not None
+    csv_text = generate_mock_csv_text()
+    connections = parse_connections_csv(csv_text)
+    asyncio.create_task(process_linkedin_import(user.id, connections, manager, session_factory))
+    return {"status": "demo_import_started", "connections_found": len(connections)}
+
+
+@app.get("/api/linkedin/connections")
+async def list_linkedin_connections(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """List all imported LinkedIn connections."""
+    result = await session.execute(
+        select(LinkedInConnection).where(LinkedInConnection.user_id == user.id)
+    )
+    return {"connections": result.scalars().all()}
+
+
+@app.get("/api/linkedin/matches")
+async def list_linkedin_matches(
+    lead_id: int | None = Query(default=None),
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """List LinkedIn matches with outreach plans."""
+    query = select(LinkedInMatch).where(LinkedInMatch.user_id == user.id)
+    if lead_id is not None:
+        query = query.where(LinkedInMatch.lead_id == lead_id)
+    result = await session.execute(query)
+    matches = result.scalars().all()
+
+    # Enrich with connection and lead info
+    enriched = []
+    for m in matches:
+        conn = (await session.execute(
+            select(LinkedInConnection).where(LinkedInConnection.id == m.connection_id)
+        )).scalar_one_or_none()
+        lead = (await session.execute(
+            select(Lead).where(Lead.id == m.lead_id)
+        )).scalar_one_or_none()
+
+        enriched.append({
+            "id": m.id,
+            "connection_id": m.connection_id,
+            "lead_id": m.lead_id,
+            "match_confidence": m.match_confidence,
+            "status": m.status,
+            "outreach_plan": m.outreach_plan,
+            "connection_name": f"{conn.first_name} {conn.last_name}" if conn else "Unknown",
+            "connection_position": conn.position if conn else None,
+            "connection_company": conn.company if conn else None,
+            "lead_company_name": lead.company_name if lead else "Unknown",
+        })
+
+    return {"matches": enriched}
+
+
+@app.delete("/api/linkedin/connections")
+async def clear_linkedin_connections(
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Clear all LinkedIn connections and matches for the current user."""
+    # Delete matches first (foreign key)
+    matches = (await session.execute(
+        select(LinkedInMatch).where(LinkedInMatch.user_id == user.id)
+    )).scalars().all()
+    for m in matches:
+        await session.delete(m)
+
+    connections = (await session.execute(
+        select(LinkedInConnection).where(LinkedInConnection.user_id == user.id)
+    )).scalars().all()
+    for c in connections:
+        await session.delete(c)
+
+    await session.commit()
+    return {"deleted": True, "connections_removed": len(connections), "matches_removed": len(matches)}
 
 
 # ─── Analytics ────────────────────────────────────────────────────────
