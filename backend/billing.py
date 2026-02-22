@@ -124,8 +124,22 @@ async def ensure_customer(user_id: int, email: str, session: AsyncSession) -> Us
             session.add(credits)
             await session.commit()
             await session.refresh(credits)
-        except Exception:
-            logger.exception("Failed to create Paid.ai customer")
+        except Exception as exc:
+            if "DUPLICATE_EXTERNAL_ID" in str(exc):
+                logger.info("Paid.ai customer exists for user %d, fetching", user_id)
+                try:
+                    existing = paid_client.customers.list_customers(
+                        external_id=str(user_id),
+                    )
+                    if existing and existing.data:
+                        credits.paid_customer_id = existing.data[0].id
+                        session.add(credits)
+                        await session.commit()
+                        await session.refresh(credits)
+                except Exception:
+                    logger.exception("Failed to fetch existing Paid.ai customer")
+            else:
+                logger.exception("Failed to create Paid.ai customer")
 
     return credits
 
