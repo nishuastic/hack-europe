@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppView } from "@/lib/types";
 import { useAuth } from "@/components/AuthContext";
 import AuthPage from "@/components/AuthPage";
@@ -19,10 +20,18 @@ import Analytics from "@/components/Analytics";
 
 export default function AppPage() {
   const { isAuthenticated, isLoading } = useAuth();
+  const searchParams = useSearchParams();
   const [view, setView] = useState<AppView>({ page: "dashboard" });
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
 
   const goTo = useCallback((v: AppView) => setView(v), []);
+
+  useEffect(() => {
+    const leadId = searchParams.get("leadId");
+    if (leadId) {
+      setView({ page: "lead-detail", leadId: Number(leadId) });
+    }
+  }, [searchParams]);
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -121,7 +130,7 @@ export default function AppPage() {
           )}
           {view.page === "analytics" && (
             <div className="p-4 sm:p-6 md:p-10">
-              <Analytics />
+              <Analytics onSelectLead={(id) => goTo({ page: "lead-detail", leadId: id })} />
             </div>
           )}
           {view.page === "billing" && (

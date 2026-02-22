@@ -34,6 +34,8 @@ export default function SetupPage() {
           if (v.page === "dashboard") router.push("/dashboard");
           if (v.page === "products") router.push("/products");
           if (v.page === "billing") router.push("/billing");
+          if (v.page === "analytics") router.push("/analytics");
+          if (v.page === "linkedin-import") router.push("/app");
         }} 
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}

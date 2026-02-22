@@ -35,6 +35,7 @@ export default function AnalyticsPage() {
           if (v.page === "products") router.push("/products");
           if (v.page === "billing") router.push("/billing");
           if (v.page === "analytics") router.push("/analytics");
+          if (v.page === "linkedin-import") router.push("/app");
         }}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -42,7 +43,7 @@ export default function AnalyticsPage() {
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
         <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-4 sm:p-6 md:p-8 w-full">
-          <Analytics />
+          <Analytics onSelectLead={(id) => router.push(`/app?leadId=${id}`)} />
         </div>
       </main>
     </div>
