@@ -139,8 +139,6 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
         company_size_target: companySizeTarget || undefined,
         geography: geography || undefined,
         stage: stage || undefined,
-        company_name: companyName || undefined,
-        website: website || undefined,
         example_clients: cleanClients.length ? cleanClients : undefined,
         current_clients: cleanCurrentClients.length ? cleanCurrentClients : undefined,
       };
@@ -366,31 +364,6 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
                   <option value="scaling">Scaling</option>
                   <option value="enterprise">Enterprise</option>
                 </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Seller Info */}
-          <div className="border-t border-slate-100 pt-6">
-            <h3 className="text-sm font-semibold text-slate-700 mb-4">Seller Info</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Company Name</label>
-                <input
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400 text-sm"
-                  placeholder="Your company name"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Website</label>
-                <input
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400 text-sm"
-                  placeholder="https://yourcompany.com"
-                />
               </div>
             </div>
           </div>

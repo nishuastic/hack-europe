@@ -142,7 +142,6 @@ class LinkedInMatch(SQLModel, table=True):
 
 class CompanyProfile(SQLModel, table=True):
     """The user's own company profile — used by AI for context when generating pitches."""
-
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="user.id", index=True)
     company_name: str
