@@ -9,8 +9,9 @@ from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from backend.billing import HOURS_SAVED, SDR_HOURLY_RATE
 from backend.config import settings
-from backend.models import GenerationRun, Lead, Product, ProductMatch
+from backend.models import GenerationRun, Lead, Product, ProductMatch, UsageEvent, UsageEventType
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +108,20 @@ async def get_analytics(session: AsyncSession, user_id: int) -> dict:
     )
     top_icp_score = top_score_result.scalar()
 
+    # Hours and dollars saved
+    usage_rows = await session.execute(
+        select(UsageEvent.event_type, func.count(UsageEvent.id))  # type: ignore[arg-type]
+        .where(UsageEvent.user_id == user_id)
+        .group_by(UsageEvent.event_type)
+    )
+    total_hours = 0.0
+    actions_breakdown: dict[str, int] = {}
+    for event_type_val, count in usage_rows.all():
+        evt = UsageEventType(event_type_val) if isinstance(event_type_val, str) else event_type_val
+        actions_breakdown[event_type_val if isinstance(event_type_val, str) else evt.value] = count
+        total_hours += HOURS_SAVED.get(evt, 0.0) * count
+    total_dollars = round(total_hours * SDR_HOURLY_RATE, 2)
+
     return {
         "total_leads": total_leads,
         "enriched_count": enriched_count,
@@ -115,6 +130,9 @@ async def get_analytics(session: AsyncSession, user_id: int) -> dict:
         "signal_frequency": signal_frequency,
         "score_distribution": score_dist,
         "top_icp_score": top_icp_score,
+        "hours_saved": round(total_hours, 1),
+        "dollars_saved": total_dollars,
+        "actions_breakdown": actions_breakdown,
     }
 
 

@@ -541,6 +541,11 @@ class ApiClient {
     return res.json();
   }
 
+  async getGlobalImpact(): Promise<{ total_hours_saved: number; total_dollars_saved: number; total_actions: number; total_customers: number }> {
+    const res = await fetch(`${API_BASE}/api/analytics/global-impact`);
+    return res.json();
+  }
+
   async getCompanyProfile(): Promise<{
     company_name?: string;
     website?: string;

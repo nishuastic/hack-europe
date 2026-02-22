@@ -1,6 +1,10 @@
 """Stick settings — loaded from .env via pydantic-settings."""
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Load .env FIRST so its values override any inherited env vars (e.g. sandbox placeholders)
+load_dotenv(override=True)
 
 
 class Settings(BaseSettings):

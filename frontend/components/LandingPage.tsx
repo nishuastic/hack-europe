@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { api } from "@/lib/api";
 
 interface LandingPageProps {
   onGetStarted: () => void;
@@ -37,6 +38,12 @@ const useScrollAnimation = (threshold = 0.3) => {
 
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
   const [scrolled, setScrolled] = useState(false);
+  const [impact, setImpact] = useState<{ total_hours_saved: number; total_dollars_saved: number; total_actions: number } | null>(null);
+  const [impactAnimated, setImpactAnimated] = useState(false);
+  const [displayHours, setDisplayHours] = useState(0);
+  const [displayDollars, setDisplayDollars] = useState(0);
+  const [displayActions, setDisplayActions] = useState(0);
+  const [displayCustomers, setDisplayCustomers] = useState(0);
   const [leadsEnriched, setLeadsEnriched] = useState(0);
   const [productsMatched, setProductsMatched] = useState(0);
   const [decksGenerated, setDecksGenerated] = useState(0);
@@ -48,6 +55,36 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    api.getGlobalImpact().then(setImpact).catch(() => { });
+  }, []);
+
+  // Use a callback ref so the observer attaches after the conditional section mounts
+  const impactObserverRef = useRef<IntersectionObserver | null>(null);
+  const impactCallbackRef = (node: HTMLDivElement | null) => {
+    // Clean up previous observer
+    if (impactObserverRef.current) {
+      impactObserverRef.current.disconnect();
+      impactObserverRef.current = null;
+    }
+    if (!node || !impact || impactAnimated) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setImpactAnimated(true);
+          animateCounter(0, impact.total_hours_saved * 10, (v) => setDisplayHours(v), 1500);
+          animateCounter(0, impact.total_dollars_saved * 10, (v) => setDisplayDollars(v), 1500);
+          animateCounter(0, impact.total_actions, setDisplayActions, 1500);
+          animateCounter(0, impact.total_customers, setDisplayCustomers, 1500);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.3 }
+    );
+    obs.observe(node);
+    impactObserverRef.current = obs;
+  };
 
   // Intersection Observer to detect when stats section is visible
   useEffect(() => {
@@ -124,8 +161,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* Navigation */}
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled
-            ? "bg-white/80 backdrop-blur-lg border-b border-slate-200 shadow-sm"
-            : "bg-transparent"
+          ? "bg-white/80 backdrop-blur-lg border-b border-slate-200 shadow-sm"
+          : "bg-transparent"
           }`}
       >
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -158,13 +195,6 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
             >
               How it works
-            </a>
-            <a
-              href="/pricing"
-              className="hidden sm:block text-sm text-slate-500 hover:text-slate-900  px-3 py-1.5"
-              style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
-            >
-              Pricing
             </a>
             <button
               onClick={onGetStarted}
@@ -210,10 +240,10 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               </span>
             </button>
             <a
-              href="#how-it-works"
+              href="/pricing"
               className="text-slate-500 text-base font-medium px-6 py-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-all flex items-center gap-2"
             >
-              See how it works
+              See pricing
             </a>
           </div>
         </div>
@@ -335,10 +365,10 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     <span className="hidden sm:block">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${row.status === "complete"
-                            ? "bg-green-50 text-green-700"
-                            : row.status === "enriching"
-                              ? "bg-blue-50 text-blue-700"
-                              : "bg-slate-100 text-slate-500"
+                          ? "bg-green-50 text-green-700"
+                          : row.status === "enriching"
+                            ? "bg-blue-50 text-blue-700"
+                            : "bg-slate-100 text-slate-500"
                           }`}
                       >
                         {row.status}
@@ -376,13 +406,43 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         </div>
       </section>
 
+      {/* Global Impact Social Proof */}
+      {impact && impact.total_actions > 0 && (
+        <section ref={impactCallbackRef} className="py-12 px-6 bg-slate-900 text-white">
+          <div className="max-w-4xl mx-auto text-center">
+            <p className="text-xs uppercase tracking-widest text-slate-400 mb-6" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>Trusted by sales teams worldwide</p>
+            <div className="flex items-center justify-center gap-12 flex-wrap" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
+              <div>
+                <p className="text-4xl font-bold tabular-nums">{(displayHours / 10).toFixed(1)}h</p>
+                <p className="text-sm text-slate-400 mt-1">Hours saved</p>
+              </div>
+              <div className="h-10 w-px bg-slate-700" />
+              <div>
+                <p className="text-4xl font-bold tabular-nums">${(displayDollars / 10).toFixed(1)}</p>
+                <p className="text-sm text-slate-400 mt-1">Dollars saved</p>
+              </div>
+              <div className="h-10 w-px bg-slate-700" />
+              <div>
+                <p className="text-4xl font-bold tabular-nums">{displayActions.toLocaleString()}</p>
+                <p className="text-sm text-slate-400 mt-1">AI actions completed</p>
+              </div>
+              <div className="h-10 w-px bg-slate-700" />
+              <div>
+                <p className="text-4xl font-bold tabular-nums">{displayCustomers.toLocaleString()}</p>
+                <p className="text-sm text-slate-400 mt-1">Customers</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Features grid */}
       <section
         ref={featuresRef.ref}
         id="features"
         className={`py-24 px-6 transition-all duration-1000 transform ${featuresRef.isVisible
-            ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-12"
+          ? "opacity-100 translate-y-0"
+          : "opacity-0 translate-y-12"
           }`}
       >
         <div className="max-w-6xl mx-auto">
@@ -445,8 +505,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               <div
                 key={i}
                 className={`transition-all duration-700 transform ${featuresRef.isVisible
-                    ? "opacity-100 translate-y-0"
-                    : "opacity-0 translate-y-12"
+                  ? "opacity-100 translate-y-0"
+                  : "opacity-0 translate-y-12"
                   }`}
                 style={{
                   transitionDelay: featuresRef.isVisible ? `${i * 100}ms` : "0ms",
@@ -474,8 +534,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         ref={howItWorksRef.ref}
         id="how-it-works"
         className={`py-24 px-6 bg-white border-y border-slate-200 transition-all duration-1000 transform ${howItWorksRef.isVisible
-            ? "opacity-100 translate-y-0"
-            : "opacity-0 translate-y-12"
+          ? "opacity-100 translate-y-0"
+          : "opacity-0 translate-y-12"
           }`}
       >
         <div className="max-w-5xl mx-auto">
@@ -515,8 +575,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               <div
                 key={i}
                 className={`text-center transition-all duration-700 transform ${howItWorksRef.isVisible
-                    ? "opacity-100 translate-x-0"
-                    : "opacity-0 -translate-x-12"
+                  ? "opacity-100 translate-x-0"
+                  : "opacity-0 -translate-x-12"
                   }`}
                 style={{
                   transitionDelay: howItWorksRef.isVisible ? `${i * 150}ms` : "0ms",

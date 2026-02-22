@@ -22,7 +22,9 @@ from backend.auth import (
 )
 from backend.billing import (
     CREDIT_COSTS,
+    HOURS_SAVED,
     PAYG_PACKS,
+    SDR_HOURLY_RATE,
     TIER_PLANS,
     check_credits,
     create_payg_checkout,
@@ -50,7 +52,6 @@ from backend.models import (
     UsageEvent,
     UsageEventType,
     User,
-    UserCredits,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -145,10 +146,8 @@ async def register(body: RegisterRequest, session: AsyncSession = Depends(get_se
     await session.commit()
     await session.refresh(user)
     assert user.id is not None
-    # Initialize free credits
-    user_credits = UserCredits(user_id=user.id, credits_remaining=100)
-    session.add(user_credits)
-    await session.commit()
+    # Initialize free credits + create Paid.ai & Stripe customers
+    await ensure_customer(user.id, user.email, user.name, session)
     access = create_access_token(user.id, user.email)
     refresh = create_refresh_token(user.id)
     return {
@@ -920,6 +919,41 @@ async def get_analytics_endpoint(session: AsyncSession = Depends(get_session), u
     return await get_analytics(session, user.id)
 
 
+@app.get("/api/analytics/global-impact")
+async def get_global_impact(session: AsyncSession = Depends(get_session)):
+    """Public endpoint: total hours and $ saved across all users, customer count from Paid.ai."""
+    from sqlalchemy import func as sa_func
+
+    from backend.billing import paid_client
+
+    rows = await session.execute(
+        select(UsageEvent.event_type, sa_func.count(UsageEvent.id))  # type: ignore[arg-type]
+        .group_by(UsageEvent.event_type)
+    )
+    total_hours = 0.0
+    total_actions = 0
+    for event_type_val, count in rows.all():
+        evt = UsageEventType(event_type_val) if isinstance(event_type_val, str) else event_type_val
+        total_hours += HOURS_SAVED.get(evt, 0.0) * count
+        total_actions += count
+
+    # Fetch real customer count from Paid.ai
+    total_customers = 0
+    if paid_client:
+        try:
+            result = paid_client.customers.list_customers(limit=1)
+            total_customers = result.pagination.total if result.pagination else len(result.data)
+        except Exception:
+            logger.warning("Failed to fetch customer count from Paid.ai")
+
+    return {
+        "total_hours_saved": round(total_hours, 1),
+        "total_dollars_saved": round(total_hours * SDR_HOURLY_RATE, 2),
+        "total_actions": total_actions,
+        "total_customers": total_customers,
+    }
+
+
 @app.post("/api/analytics/predict")
 async def trigger_predictions(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
     """Predict conversion likelihood for matches missing predictions."""
@@ -948,7 +982,7 @@ async def get_credits(
 ):
     """Get current user's credit balance + available plans and packs."""
     assert user.id is not None
-    credits = await ensure_customer(user.id, user.email, session)
+    credits = await ensure_customer(user.id, user.email, user.name, session)
     return {
         "currency": "stick_credits",
         "credits_remaining": credits.credits_remaining,
@@ -973,7 +1007,7 @@ async def subscribe_tier(
 ):
     """Create a Stripe Checkout session for a monthly tier subscription."""
     assert user.id is not None
-    await ensure_customer(user.id, user.email, session)
+    await ensure_customer(user.id, user.email, user.name, session)
     url = await create_tier_checkout(user.id, body.tier, session)
     return {"checkout_url": url}
 
@@ -986,7 +1020,7 @@ async def buy_credits(
 ):
     """Create a Stripe Checkout session for a one-time credit pack purchase."""
     assert user.id is not None
-    await ensure_customer(user.id, user.email, session)
+    await ensure_customer(user.id, user.email, user.name, session)
     url = await create_payg_checkout(user.id, body.pack, session)
     return {"checkout_url": url}
 
