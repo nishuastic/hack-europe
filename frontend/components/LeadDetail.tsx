@@ -169,7 +169,7 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
       <section className="bg-white border-b border-slate-200/60 px-4 sm:px-6 md:px-8 py-4 sm:py-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-start gap-5">
-            <button onClick={onBack} className="mt-1 p-1 text-slate-400 hover:text-slate-900 transition-colors rounded hover:bg-slate-100">
+            <button onClick={onBack} className="mt-1 p-2 text-slate-400 hover:text-slate-900 transition-colors rounded hover:bg-slate-100">
               <span className="material-symbols-outlined text-[20px]">arrow_back</span>
             </button>
             {lead.company_url ? (

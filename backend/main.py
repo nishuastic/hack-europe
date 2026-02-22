@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -451,6 +452,47 @@ async def learn_icp(
         "customers_to_research": len(product.current_clients),
         "credits_used": total_cost,
     }
+
+
+class ICPProfileUpdate(BaseModel):
+    icp_summary: Optional[str] = None
+    target_industries: Optional[list[str]] = None
+    geographies: Optional[list[str]] = None
+    funding_stages: Optional[list[str]] = None
+    revenue_range: Optional[str] = None
+    employee_range_min: Optional[int] = None
+    employee_range_max: Optional[int] = None
+    common_traits: Optional[list[str]] = None
+    anti_patterns: Optional[list[str]] = None
+
+
+@app.patch("/api/products/{product_id}/icp")
+async def update_icp_profile(
+    product_id: int,
+    body: ICPProfileUpdate,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Manually update fields of the ICP profile for a product."""
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    icp = (
+        await session.execute(select(ICPProfile).where(ICPProfile.product_id == product_id))
+    ).scalar_one_or_none()
+    if not icp:
+        raise HTTPException(status_code=404, detail="ICP profile not found")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(icp, field, value)
+
+    session.add(icp)
+    await session.commit()
+    await session.refresh(icp)
+    return icp
 
 
 @app.get("/api/products/{product_id}/icp")

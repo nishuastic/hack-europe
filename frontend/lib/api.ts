@@ -689,6 +689,16 @@ class ApiClient {
     return res.json();
   }
 
+  async updateICPProfile(productId: number, data: Partial<Pick<ICPProfile, "icp_summary" | "target_industries" | "geographies" | "funding_stages" | "revenue_range" | "employee_range_min" | "employee_range_max" | "common_traits" | "anti_patterns">>): Promise<ICPProfile> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products/${productId}/icp`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error("Failed to update ICP profile");
+    return res.json();
+  }
+
   async learnICP(productId: number): Promise<void> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/products/${productId}/learn-icp`, {
       method: "POST",
