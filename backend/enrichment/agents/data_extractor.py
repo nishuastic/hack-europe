@@ -75,6 +75,7 @@ Return ONLY valid JSON with this exact structure:
     "revenue": "Revenue estimate if available, or null",
     "employees": integer or null,
     "contacts": [{"name": "...", "role": "...", "linkedin": "...or null"}],
+    "company_fit": "Brief assessment of fit as potential client, or null",
     "customers": ["Company A", "Company B"],
     "buying_signals": [
       {"signal_type": "recent_funding", "description": "Raised $45M Series B", "strength": "strong"}

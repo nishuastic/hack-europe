@@ -76,6 +76,8 @@ def _build_lead_profile(lead: Lead) -> str:
     sections = [f"Company: {lead.company_name}"]
     if lead.description:
         sections.append(f"Description: {lead.description}")
+    if lead.company_fit:
+        sections.append(f"Company fit: {lead.company_fit}")
     if lead.industry:
         sections.append(f"Industry: {lead.industry}")
     if lead.funding:

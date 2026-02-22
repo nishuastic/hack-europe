@@ -43,7 +43,8 @@ def build_discovery_prompt(
         if p.example_clients:
             parts.append(f"**Example clients:** {', '.join(p.example_clients)}")
         if p.current_clients:
-            parts.append(f"**Current clients:** {', '.join(p.current_clients)}")
+            client_names = [c["name"] if isinstance(c, dict) else str(c) for c in p.current_clients]
+            parts.append(f"**Current clients:** {', '.join(client_names)}")
         if p.company_name:
             parts.append(f"**Selling company:** {p.company_name}")
         if p.website:
