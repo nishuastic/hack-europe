@@ -144,7 +144,7 @@ export default function AuthPage({ mode, onSwitchMode }: AuthPageProps) {
               {mode === "login"
                 ? "Don't have an account? "
                 : "Already have an account? "}
-              <span className="font-medium text-primary">
+              <span className="font-medium text-black">
                 {mode === "login" ? "Sign up" : "Sign in"}
               </span>
             </button>
