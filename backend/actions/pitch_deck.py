@@ -223,14 +223,14 @@ def _set_slide_bg(slide) -> None:
     fill.solid()
     fill.fore_color.rgb = _rgb(_BG_DARK)
     # Add subtle gradient effect via a second darker rectangle behind everything
-    from pptx.util import Emu
+    from pptx.util import Emu, Inches
 
     gradient_shape = slide.shapes.add_shape(
         1,  # MSO_SHAPE.RECTANGLE
         Emu(0),
         Emu(0),
-        slide.slide_layout.slide_master.slide_width,
-        slide.slide_layout.slide_master.slide_height,
+        Inches(13.333),
+        Inches(7.5),
     )
     gradient_shape.fill.solid()
     gradient_shape.fill.fore_color.rgb = _rgb(_BG_GRADIENT)

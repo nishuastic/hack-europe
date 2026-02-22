@@ -128,7 +128,7 @@ export default function PitchDeckEditor({
               <button
                 onClick={handleGenerate}
                 disabled={!selectedProductId}
-                className="flex items-center justify-center gap-2 h-8 px-3 bg-blue-600 text-white text-sm font-medium rounded-md transition-colors shadow-sm hover:bg-blue-700 disabled:opacity-50"
+                className="flex items-center justify-center gap-2 h-8 px-3 bg-slate-900 text-white text-sm font-medium rounded-md transition-colors shadow-sm hover:bg-slate-800 disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
                 <span className="hidden sm:inline">Generate</span>
