@@ -129,6 +129,18 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
         {/* Logout dropdown (above avatar) */}
         {showLogout && (
           <div className={`mb-2 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden ${collapsed ? 'w-40 -translate-x-1/4' : ''}`}>
+            {onProfileClick && (
+              <button
+                onClick={() => {
+                  setShowLogout(false);
+                  onProfileClick();
+                }}
+                className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left border-b border-slate-100"
+              >
+                <span className="material-symbols-outlined text-[18px]">manage_accounts</span>
+                Set up profile
+              </button>
+            )}
             <button
               onClick={() => {
                 setShowLogout(false);
