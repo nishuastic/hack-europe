@@ -243,6 +243,7 @@ class BulkProductImport(BaseModel):
 
 class LeadImport(BaseModel):
     companies: list[str]
+    generation_run_id: int | None = None
 
 
 class CompanyProfileUpdate(BaseModel):
@@ -649,12 +650,25 @@ async def import_leads(
 ):
     lead_ids: list[int] = []
     for company in body.companies:
-        lead = Lead(company_name=company, enrichment_status=EnrichmentStatus.PENDING, user_id=user.id)
+        lead = Lead(
+            company_name=company,
+            enrichment_status=EnrichmentStatus.PENDING,
+            user_id=user.id,
+            generation_run_id=body.generation_run_id,
+        )
         session.add(lead)
         await session.commit()
         await session.refresh(lead)
         assert lead.id is not None
         lead_ids.append(lead.id)
+
+    # Bump lead_count on the run if provided
+    if body.generation_run_id is not None:
+        run = await session.get(GenerationRun, body.generation_run_id)
+        if run is not None and run.user_id == user.id:
+            run.lead_count = (run.lead_count or 0) + len(lead_ids)
+            session.add(run)
+            await session.commit()
 
     # Fire-and-forget enrichment
     asyncio.create_task(enrich_leads(lead_ids, manager))

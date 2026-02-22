@@ -112,20 +112,27 @@ export interface PitchSlide {
 }
 
 export interface AnalyticsOpportunity {
+  lead_id: number;
   company_name: string;
   product_name: string;
   match_score: number;
+  icp_score?: number;
   conversion_likelihood: string | null;
 }
 
 export interface AnalyticsData {
   total_leads: number;
   enriched_count: number;
-  industry_breakdown: Record<string, number>;
+  industry_breakdown?: Record<string, number>;
   score_distribution: Record<string, number>;
-  avg_match_score_by_product: Record<string, number>;
+  avg_match_score_by_product?: Record<string, number>;
+  avg_icp_score_by_product?: Record<string, number>;
   signal_frequency: Record<string, number>;
   top_opportunities: AnalyticsOpportunity[];
+  top_icp_score?: number | null;
+  hours_saved?: number;
+  dollars_saved?: number;
+  actions_breakdown?: Record<string, number>;
 }
 
 export type WebSocketMessageHandler = (msg: WSMessage) => void;
@@ -410,11 +417,12 @@ class ApiClient {
 
   async importLeads(
     companies: string[],
+    generationRunId?: number,
   ): Promise<{ leads_created: number; lead_ids: number[]; status: string }> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/leads/import`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ companies }),
+      body: JSON.stringify({ companies, generation_run_id: generationRunId }),
     });
     return res.json();
   }

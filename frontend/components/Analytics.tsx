@@ -1,25 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
-
-interface AnalyticsData {
-  total_leads: number;
-  enriched_count: number;
-  avg_icp_score_by_product: Record<string, number>;
-  top_opportunities: {
-    lead_id: number;
-    company_name: string;
-    product_name: string;
-    icp_score: number;
-  }[];
-  signal_frequency: Record<string, number>;
-  score_distribution: Record<string, number>;
-  top_icp_score: number | null;
-  hours_saved: number;
-  dollars_saved: number;
-  actions_breakdown: Record<string, number>;
-}
+import { api, AnalyticsData } from "@/lib/api";
 
 function StatItem({ label, value }: { label: string; value: string | number }) {
   return (
@@ -68,7 +50,7 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
   useEffect(() => {
     api
       .getAnalytics()
-      .then((d) => setData(d as AnalyticsData))
+      .then((d) => setData(d))
       .catch((err) => console.error("Failed to load analytics:", err))
       .finally(() => setLoading(false));
   }, []);

@@ -53,6 +53,9 @@ export default function GenerationRunDetail({
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addText, setAddText] = useState("");
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -165,6 +168,13 @@ export default function GenerationRunDetail({
           )}
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Add companies
+          </button>
           <div className="relative">
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -415,6 +425,80 @@ export default function GenerationRunDetail({
           </div>
         </div>
       </div>
+
+      {/* Add companies modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">
+              Add more companies
+            </h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Paste company names, one per line. They will be enriched and
+              appear live in the table.
+            </p>
+            <textarea
+              className="w-full border border-slate-200 rounded-lg p-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+              rows={6}
+              placeholder={"Acme Corp\nGlobex Inc\nInitech"}
+              value={addText}
+              onChange={(e) => setAddText(e.target.value)}
+              autoFocus
+            />
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => {
+                  setShowAddModal(false);
+                  setAddText("");
+                }}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={adding || !addText.trim()}
+                onClick={async () => {
+                  const companies = addText
+                    .split("\n")
+                    .map((l) => l.trim())
+                    .filter(Boolean);
+                  if (!companies.length) return;
+                  setAdding(true);
+                  try {
+                    const result = await api.importLeads(companies, runId);
+                    // Optimistically add pending rows
+                    const newLeads: Lead[] = result.lead_ids.map((id, i) => ({
+                      id,
+                      company_name: companies[i],
+                      enrichment_status: "pending",
+                    }));
+                    setLeads((prev) => [...prev, ...newLeads]);
+                    // Bump run lead count
+                    setRun((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            lead_count:
+                              (prev.lead_count ?? 0) + companies.length,
+                          }
+                        : prev,
+                    );
+                    setShowAddModal(false);
+                    setAddText("");
+                  } catch {
+                    // ignore
+                  } finally {
+                    setAdding(false);
+                  }
+                }}
+                className="bg-primary hover:bg-primary/90 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-medium transition-all"
+              >
+                {adding ? "Adding…" : "Add companies"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

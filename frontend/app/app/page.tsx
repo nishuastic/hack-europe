@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppView } from "@/lib/types";
 import { useAuth } from "@/components/AuthContext";
@@ -59,6 +59,14 @@ function parseHash(hash: string): AppView | null {
 }
 
 export default function AppPage() {
+  return (
+    <Suspense>
+      <AppPageInner />
+    </Suspense>
+  );
+}
+
+function AppPageInner() {
   const { isAuthenticated, isLoading } = useAuth();
   const searchParams = useSearchParams();
   const [view, setView] = useState<AppView>(() => {
