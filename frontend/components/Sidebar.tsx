@@ -24,10 +24,15 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
     <aside className={`bg-white border-r border-slate-200/60 flex-col z-20 hidden md:flex shrink-0 h-screen transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
       {/* Logo & Toggle */}
       <div className="px-4 py-5 flex items-center gap-3 relative">
-        <div className="size-8 text-black flex items-center justify-center bg-primary/5 rounded-lg border border-primary/10 shrink-0">
-          <span className="material-symbols-outlined text-[20px]">
-            auto_graph
-          </span>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
+          <span
+            className="w-7 h-7 bg-black"
+            style={{
+              WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
+              mask: "url('/stick_2.svg') center / contain no-repeat",
+            }}
+            aria-label="Stick logo"
+          />
         </div>
         {!collapsed && (
           <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-900">

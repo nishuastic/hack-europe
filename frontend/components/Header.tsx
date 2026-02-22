@@ -55,8 +55,15 @@ export default function Header() {
             {/* Drawer header */}
             <div className="px-4 py-5 flex items-center justify-between border-b border-slate-200/60">
               <div className="flex items-center gap-3">
-                <div className="size-8 text-blue-600 flex items-center justify-center bg-blue-50 rounded-lg border border-blue-100">
-                  <span className="material-symbols-outlined text-[20px]">auto_graph</span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+                  <span
+                    className="w-7 h-7 bg-black"
+                    style={{
+                      WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
+                      mask: "url('/stick_2.svg') center / contain no-repeat",
+                    }}
+                    aria-label="Stick logo"
+                  />
                 </div>
                 <h2 className="text-lg font-bold tracking-tight text-slate-900">Stick</h2>
               </div>

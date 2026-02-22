@@ -235,27 +235,32 @@ export default function GenerationRunDetail({
 
       {/* Table */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-100">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="min-w-full divide-y divide-slate-100 table-fixed">
             <thead>
               <tr>
-                {[
-                  "Company Name",
-                  "Industry",
-                  "Employees",
-                  "Revenue",
-                  "ICP Fit",
-                  "Status",
-                  "Assets",
-                ].map((h, i) => (
-                  <th
-                    key={h}
-                    className={`px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide ${i === 0 ? "w-[25%]" : ""}`}
-                  >
-                    {h}
-                  </th>
-                ))}
-                <th className="relative px-6 py-4">
+                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap max-w-[200px]">
+                  Company Name
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap max-w-[150px]">
+                  Industry
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap max-w-[100px]">
+                  Employees
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap max-w-[100px]">
+                  Revenue
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap max-w-[80px]">
+                  ICP Fit
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap max-w-[100px]">
+                  Status
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-medium text-slate-500 uppercase tracking-wide whitespace-nowrap max-w-[80px]">
+                  Assets
+                </th>
+                <th className="relative px-6 py-4 whitespace-nowrap max-w-[50px]">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
@@ -295,7 +300,7 @@ export default function GenerationRunDetail({
                     onClick={() => onSelectLead(lead.id)}
                     className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                   >
-                    <td className="px-6 py-3.5">
+                    <td className="px-6 py-3.5 whitespace-nowrap max-w-[200px]">
                       <div className="flex items-center">
                         {lead.company_url ? (
                           <img
@@ -310,26 +315,26 @@ export default function GenerationRunDetail({
                             </span>
                           </div>
                         )}
-                        <div className="ml-3">
-                          <div className="text-sm font-medium text-slate-900">
+                        <div className="ml-3 min-w-0">
+                          <div className="text-sm font-medium text-slate-900 truncate">
                             {lead.company_name}
                           </div>
-                          <div className="text-xs text-slate-400 mt-0.5">
+                          <div className="text-xs text-slate-400 mt-0.5 truncate">
                             {lead.company_url || "N/A"}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap text-sm text-slate-500">
+                    <td className="px-6 py-3.5 whitespace-nowrap max-w-[150px] text-sm text-slate-500 truncate">
                       {lead.industry || "-"}
                     </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap text-sm text-slate-500">
+                    <td className="px-6 py-3.5 whitespace-nowrap max-w-[100px] text-sm text-slate-500 truncate">
                       {empRange(lead.employees)}
                     </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap text-sm text-slate-500">
+                    <td className="px-6 py-3.5 whitespace-nowrap max-w-[100px] text-sm text-slate-500 truncate">
                       {lead.revenue || "-"}
                     </td>
-                    <td className="px-6 py-3.5 whitespace-nowrap">
+                    <td className="px-6 py-3.5 whitespace-nowrap max-w-[80px]">
                       {lead.icp_fit_score != null ? (
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
