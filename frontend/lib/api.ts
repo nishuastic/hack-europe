@@ -496,6 +496,28 @@ class ApiClient {
     return res.json();
   }
 
+  async listEmails(
+    leadId: number,
+    productId: number,
+  ): Promise<{ id: number; subject: string; body: string; contact_name: string; contact_role: string; created_at: string }[]> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/leads/${leadId}/emails?product_id=${productId}`,
+    );
+    if (!res.ok) return [];
+    return res.json();
+  }
+
+  async getLatestEmail(
+    leadId: number,
+    productId: number,
+  ): Promise<{ id: number; subject: string; body: string; contact_name: string; contact_role: string; created_at: string } | null> {
+    const res = await this.fetchWithAuth(
+      `${API_BASE}/api/leads/${leadId}/email/latest?product_id=${productId}`,
+    );
+    if (!res.ok) return null;
+    return res.json();
+  }
+
   async generateVoice(leadId: number): Promise<void> {
     await this.fetchWithAuth(`${API_BASE}/api/leads/${leadId}/voice`, {
       method: "POST",
