@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
+import { api, ICPProfile } from "@/lib/api";
 
 interface ProductEditProps {
   productId?: number;
@@ -24,6 +24,10 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
   const [exampleClients, setExampleClients] = useState([""]);
   const [currentClients, setCurrentClients] = useState<{name: string; website: string}[]>([{name: "", website: ""}]);
   const [loadingProduct, setLoadingProduct] = useState(!isNew);
+  
+  const [icpProfile, setIcpProfile] = useState<ICPProfile | null>(null);
+  const [icpLoading, setIcpLoading] = useState(false);
+  const [icpLearning, setIcpLearning] = useState(false);
 
   useEffect(() => {
     if (!productId) return;
@@ -45,7 +49,27 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
         setCurrentClients((product as any).current_clients?.length ? [...(product as any).current_clients, {name: "", website: ""}] : [{name: "", website: ""}]);
       }
     }).finally(() => setLoadingProduct(false));
+
+    api.getICPProfile(productId).then((res) => {
+      if ("status" in res && res.status === "no_icp") return;
+      setIcpProfile(res as ICPProfile);
+    });
   }, [productId]);
+
+  const handleLearnICP = async () => {
+    if (!productId) return;
+    setIcpLearning(true);
+    try {
+      await api.learnICP(productId);
+      const res = await api.getICPProfile(productId);
+      if ("status" in res && res.status === "no_icp") return;
+      setIcpProfile(res as ICPProfile);
+    } catch (err) {
+      console.error("Failed to learn ICP:", err);
+    } finally {
+      setIcpLearning(false);
+    }
+  };
 
   const updateFeature = (idx: number, val: string) => {
     const next = [...features];
@@ -406,7 +430,154 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
                   )}
                 </div>
               ))}
+              </div>
+          </div>
+
+          {/* ICP Profile */}
+          <div className="border-t border-slate-100 pt-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-700">AI-Generated ICP</h3>
+              {!isNew && (
+                <button
+                  onClick={handleLearnICP}
+                  disabled={icpLearning}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 text-white text-xs font-medium hover:bg-slate-700 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {icpLearning ? "progress_activity" : "auto_awesome"}
+                  </span>
+                  {icpLearning ? "Learning..." : icpProfile ? "Regenerate ICP" : "Generate ICP"}
+                </button>
+              )}
             </div>
+            
+            {icpProfile ? (
+              <div className="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                {icpProfile.icp_summary && (
+                  <div className="mb-4">
+                    <p className="text-sm text-slate-700 leading-relaxed">{icpProfile.icp_summary}</p>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {icpProfile.target_industries?.length ? (
+                    <div className="bg-white rounded-lg p-3 border border-slate-200">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mb-1.5">
+                        <span className="material-symbols-outlined text-[14px]">business</span>
+                        Target Industries
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {icpProfile.target_industries.map((ind, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs">
+                            {ind}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  
+                  {icpProfile.geographies?.length ? (
+                    <div className="bg-white rounded-lg p-3 border border-slate-200">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mb-1.5">
+                        <span className="material-symbols-outlined text-[14px]">public</span>
+                        Geographies
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {icpProfile.geographies.map((geo, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs">
+                            {geo}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  
+                  {icpProfile.funding_stages?.length ? (
+                    <div className="bg-white rounded-lg p-3 border border-slate-200">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mb-1.5">
+                        <span className="material-symbols-outlined text-[14px]">trending_up</span>
+                        Funding Stages
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {icpProfile.funding_stages.map((stage, i) => (
+                          <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs">
+                            {stage}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  
+                  {icpProfile.revenue_range ? (
+                    <div className="bg-white rounded-lg p-3 border border-slate-200">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mb-1.5">
+                        <span className="material-symbols-outlined text-[14px]">attach_money</span>
+                        Revenue Range
+                      </div>
+                      <p className="text-sm text-slate-700">{icpProfile.revenue_range}</p>
+                    </div>
+                  ) : null}
+                  
+                  {(icpProfile.employee_range_min || icpProfile.employee_range_max) ? (
+                    <div className="bg-white rounded-lg p-3 border border-slate-200">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mb-1.5">
+                        <span className="material-symbols-outlined text-[14px]">groups</span>
+                        Company Size
+                      </div>
+                      <p className="text-sm text-slate-700">
+                        {icpProfile.employee_range_min}-{icpProfile.employee_range_max} employees
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+                
+                {icpProfile.common_traits?.length ? (
+                  <div className="mt-4 bg-white rounded-lg p-3 border border-slate-200">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600 mb-1.5">
+                      <span className="material-symbols-outlined text-[14px]">check_circle</span>
+                      Common Traits
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {icpProfile.common_traits.map((trait, i) => (
+                        <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs">
+                          {trait}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                
+                {icpProfile.anti_patterns?.length ? (
+                  <div className="mt-4 bg-white rounded-lg p-3 border border-slate-200">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mb-1.5">
+                      <span className="material-symbols-outlined text-[14px]">block</span>
+                      Anti-Patterns
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {icpProfile.anti_patterns.map((pattern, i) => (
+                        <span key={i} className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-xs">
+                          {pattern}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                
+                <div className="mt-4 text-xs text-slate-500">
+                  Based on {icpProfile.customers_researched} companies researched
+                </div>
+              </div>
+            ) : !isNew ? (
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center">
+                <div className="w-10 h-10 mx-auto mb-3 rounded-full bg-slate-100 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-slate-400 text-xl">psychology</span>
+                </div>
+                <p className="text-sm text-slate-600 mb-1">No ICP generated yet</p>
+                <p className="text-xs text-slate-400">
+                  Generate an AI-powered ICP based on your product and current clients
+                </p>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

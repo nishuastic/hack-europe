@@ -18,16 +18,11 @@ interface AnalyticsData {
   top_icp_score: number | null;
 }
 
-function StatCard({ label, value, icon }: { label: string; value: string | number; icon: string }) {
+function StatItem({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-lg p-5 flex items-center gap-4">
-      <div className="size-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-        <span className="material-symbols-outlined text-[20px] text-slate-600">{icon}</span>
-      </div>
-      <div>
-        <p className="text-2xl font-semibold text-slate-900">{value}</p>
-        <p className="text-xs text-slate-500 font-medium">{label}</p>
-      </div>
+    <div>
+      <p className="text-[11px] uppercase tracking-widest text-slate-400 font-medium mb-1">{label}</p>
+      <p className="text-5xl font-bold text-slate-900 tabular-nums">{value}</p>
     </div>
   );
 }
@@ -92,7 +87,14 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
     );
   }
 
-  const topScore = data.top_icp_score != null ? `${data.top_icp_score}/100` : "-";
+  const topScore = data.top_icp_score != null ? `${data.top_icp_score}` : "-";
+
+  const avgScores = Object.values(data.avg_icp_score_by_product);
+  const avgIcp = avgScores.length > 0
+    ? Math.round(avgScores.reduce((a, b) => a + b, 0) / avgScores.length)
+    : "-";
+
+  const totalSignals = Object.values(data.signal_frequency).reduce((a, b) => a + b, 0);
 
   return (
     <div className="max-w-[1400px] mx-auto w-full flex flex-col gap-8 pb-10">
@@ -102,11 +104,15 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
         <p className="text-sm text-slate-500 mt-1">Overview of your pipeline performance and insights.</p>
       </div>
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <StatCard label="Total Leads" value={data.total_leads} icon="group" />
-        <StatCard label="Enriched" value={data.enriched_count} icon="check_circle" />
-        <StatCard label="Top ICP Score" value={topScore} icon="star" />
+      {/* Stats */}
+      <div className="flex items-end justify-center gap-16">
+        <StatItem label="Total Leads" value={data.total_leads} />
+        <div className="h-10 w-px bg-slate-200" />
+        <StatItem label="Top ICP" value={topScore} />
+        <div className="h-10 w-px bg-slate-200" />
+        <StatItem label="Avg ICP" value={avgIcp} />
+        <div className="h-10 w-px bg-slate-200" />
+        <StatItem label="Signals Found" value={totalSignals} />
       </div>
 
       {/* Buying signals + Top opportunities side by side */}
