@@ -40,6 +40,7 @@ from backend.models import (
     EnrichmentStatus,
     GeneratedEmail,
     GenerationRun,
+    ICPProfile,
     Lead,
     LinkedInConnection,
     LinkedInMatch,
@@ -323,6 +324,68 @@ async def delete_product(
     await session.delete(product)
     await session.commit()
     return {"deleted": True}
+
+
+# ─── ICP Learning ────────────────────────────────────────────────────
+
+
+@app.post("/api/products/{product_id}/learn-icp")
+async def learn_icp(
+    product_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Trigger ICP learning for a product based on its current_clients."""
+    assert user.id is not None
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if not product.current_clients or len(product.current_clients) == 0:
+        raise HTTPException(status_code=400, detail="Product has no current_clients to learn from")
+
+    # Credit check: 3 credits per customer
+    total_cost = len(product.current_clients) * 3
+    if not await check_credits(user.id, UsageEventType.ICP_RESEARCH, session):
+        raise HTTPException(status_code=402, detail="Insufficient credits for ICP research")
+
+    await deduct_credits(
+        user.id, UsageEventType.ICP_RESEARCH, session,
+        {"product_id": product_id, "customers": len(product.current_clients)},
+    )
+
+    from backend.icp.icp_pipeline import run_icp_learning
+
+    asyncio.create_task(run_icp_learning(product_id, manager))
+    return {
+        "status": "icp_learning_started",
+        "product_id": product_id,
+        "customers_to_research": len(product.current_clients),
+        "credits_used": total_cost,
+    }
+
+
+@app.get("/api/products/{product_id}/icp")
+async def get_icp_profile(
+    product_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Get the ICP profile for a product."""
+    # Verify product belongs to user
+    product = (
+        await session.execute(select(Product).where(Product.id == product_id, Product.user_id == user.id))
+    ).scalar_one_or_none()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    icp = (
+        await session.execute(select(ICPProfile).where(ICPProfile.product_id == product_id))
+    ).scalar_one_or_none()
+    if not icp:
+        return {"status": "no_icp"}
+    return icp
 
 
 # ─── Company Profile ──────────────────────────────────────────────────

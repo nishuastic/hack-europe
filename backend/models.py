@@ -34,6 +34,15 @@ class UsageEventType(str, Enum):
     PITCH_DECK = "pitch_deck"
     EMAIL = "email"
     LINKEDIN_OUTREACH = "linkedin_outreach"
+    ICP_RESEARCH = "icp_research"
+
+
+class ICPResearchStatus(str, Enum):
+    PENDING = "pending"
+    RESEARCHING_CUSTOMERS = "researching_customers"
+    EXTRACTING_ICP = "extracting_icp"
+    COMPLETE = "complete"
+    FAILED = "failed"
 
 
 class UserCredits(SQLModel, table=True):
@@ -183,6 +192,10 @@ class Lead(SQLModel, table=True):
     customers: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
     buying_signals: Optional[list[BuyingSignal]] = Field(default=None, sa_column=Column(JSON))
 
+    # ICP fit (scored during enrichment if ICPProfile exists)
+    icp_fit_score: Optional[float] = None
+    icp_fit_reasoning: Optional[str] = None
+
     # Status tracking
     enrichment_status: EnrichmentStatus = EnrichmentStatus.PENDING
 
@@ -259,3 +272,40 @@ class PitchHistory(SQLModel, table=True):
     created_at: datetime = Field(default_factory=_utcnow)
     outcome: str  # "meeting_booked", "no_response", "rejected", "interested"
     notes: Optional[str] = None
+
+
+class CustomerResearch(SQLModel, table=True):
+    """Researched data for a single customer used in ICP learning."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product_id: int = Field(foreign_key="product.id", index=True)
+    customer_name: str
+    customer_url: str
+    industry: Optional[str] = None
+    employee_count: Optional[int] = None
+    revenue: Optional[str] = None
+    funding_stage: Optional[str] = None
+    geography: Optional[str] = None
+    description: Optional[str] = None
+    tech_stack: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
+    raw_research: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=_utcnow)
+
+
+class ICPProfile(SQLModel, table=True):
+    """Derived Ideal Customer Profile rubrics per product."""
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    product_id: int = Field(foreign_key="product.id", unique=True, index=True)
+    status: ICPResearchStatus = ICPResearchStatus.PENDING
+    target_industries: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
+    employee_range_min: Optional[int] = None
+    employee_range_max: Optional[int] = None
+    revenue_range: Optional[str] = None
+    funding_stages: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
+    geographies: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
+    common_traits: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
+    anti_patterns: Optional[list[str]] = Field(default=None, sa_column=Column(JSON))
+    icp_summary: Optional[str] = None
+    customers_researched: int = 0
+    created_at: datetime = Field(default_factory=_utcnow)

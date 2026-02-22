@@ -46,9 +46,26 @@ export interface Lead {
   enrichment_status: string;
   pitch_deck_generated?: boolean;
   email_generated?: boolean;
-  voice_generated?: boolean;
   best_match_product?: string;
   best_match_score?: number;
+  icp_fit_score?: number;
+  icp_fit_reasoning?: string;
+}
+
+export interface ICPProfile {
+  id: number;
+  product_id: number;
+  status: string;
+  target_industries?: string[];
+  employee_range_min?: number;
+  employee_range_max?: number;
+  revenue_range?: string;
+  funding_stages?: string[];
+  geographies?: string[];
+  common_traits?: string[];
+  anti_patterns?: string[];
+  icp_summary?: string;
+  customers_researched: number;
 }
 
 export interface Contact {
@@ -131,6 +148,25 @@ export interface LinkedInMatch {
   connection_position?: string;
   connection_company?: string;
   lead_company_name: string;
+}
+
+export interface AnalyticsTopOpportunity {
+  lead_id: number;
+  company_name: string;
+  product_id: number;
+  product_name: string;
+  match_score: number;
+  conversion_likelihood: string | null;
+}
+
+export interface AnalyticsData {
+  total_leads: number;
+  enriched_count: number;
+  industry_breakdown: Record<string, number>;
+  avg_match_score_by_product: Record<string, number>;
+  top_opportunities: AnalyticsTopOpportunity[];
+  signal_frequency: Record<string, number>;
+  score_distribution: Record<string, number>;
 }
 
 export type WebSocketMessageHandler = (msg: WSMessage) => void;
@@ -383,6 +419,22 @@ class ApiClient {
     });
   }
 
+  async learnICP(productId: number): Promise<{ status: string; customers_to_research: number }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products/${productId}/learn-icp`, {
+      method: "POST",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Failed to start ICP learning" }));
+      throw new Error(err.detail || `Error: ${res.status}`);
+    }
+    return res.json();
+  }
+
+  async getICPProfile(productId: number): Promise<ICPProfile | { status: "no_icp" }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/products/${productId}/icp`);
+    return res.json();
+  }
+
   async importProducts(products: Omit<Product, "id">[]): Promise<Product[]> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/products`, {
       method: "POST",
@@ -513,7 +565,7 @@ class ApiClient {
     return res.json();
   }
 
-  async getAnalytics(): Promise<unknown> {
+  async getAnalytics(): Promise<AnalyticsData> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/analytics`);
     return res.json();
   }

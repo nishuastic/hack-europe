@@ -244,6 +244,7 @@ export default function GenerationRunDetail({
                   "Industry",
                   "Employees",
                   "Revenue",
+                  "ICP Fit",
                   "Status",
                   "Assets",
                 ].map((h, i) => (
@@ -263,7 +264,7 @@ export default function GenerationRunDetail({
               {loading ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-6 py-8 text-center text-slate-500"
                   >
                     Loading leads...
@@ -272,7 +273,7 @@ export default function GenerationRunDetail({
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-6 py-12 text-center"
                   >
                     <div className="flex flex-col items-center gap-3">
@@ -329,6 +330,24 @@ export default function GenerationRunDetail({
                       {lead.revenue || "-"}
                     </td>
                     <td className="px-6 py-3.5 whitespace-nowrap">
+                      {lead.icp_fit_score != null ? (
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                            lead.icp_fit_score >= 70
+                              ? "bg-green-100 text-green-700"
+                              : lead.icp_fit_score >= 40
+                                ? "bg-yellow-100 text-yellow-700"
+                                : "bg-red-100 text-red-700"
+                          }`}
+                          title={lead.icp_fit_reasoning || ""}
+                        >
+                          {Math.round(lead.icp_fit_score)}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-slate-300">--</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3.5 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <div
                           className={`w-1.5 h-1.5 rounded-full ${statusDot(lead.enrichment_status)}`}
@@ -357,16 +376,6 @@ export default function GenerationRunDetail({
                           }
                         >
                           mail
-                        </span>
-                        <span
-                          className={`material-symbols-outlined text-[16px] ${lead.voice_generated ? "text-slate-800" : "text-slate-300"}`}
-                          title={
-                            lead.voice_generated
-                              ? "Voice Briefing Generated"
-                              : "Pending"
-                          }
-                        >
-                          mic
                         </span>
                       </div>
                     </td>

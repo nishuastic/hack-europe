@@ -43,7 +43,7 @@ export default function ProductEditPage() {
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-10 w-full">
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-4 sm:p-6 md:p-10 w-full">
           <ProductEdit
             productId={productId}
             onBack={() => router.push("/products")}
