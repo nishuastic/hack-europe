@@ -92,11 +92,6 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
 
   const topScore = data.top_icp_score != null ? `${data.top_icp_score}` : "-";
 
-  const avgScores = Object.values(data.avg_icp_score_by_product);
-  const avgIcp = avgScores.length > 0
-    ? Math.round(avgScores.reduce((a, b) => a + b, 0) / avgScores.length)
-    : "-";
-
   const totalSignals = Object.values(data.signal_frequency).reduce((a, b) => a + b, 0);
 
   return (
@@ -112,8 +107,6 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
         <StatItem label="Total Leads" value={data.total_leads} />
         <div className="h-10 w-px bg-slate-200" />
         <StatItem label="Top ICP" value={topScore} />
-        <div className="h-10 w-px bg-slate-200" />
-        <StatItem label="Avg ICP" value={avgIcp} />
         <div className="h-10 w-px bg-slate-200" />
         <StatItem label="Signals Found" value={totalSignals} />
         <div className="h-10 w-px bg-slate-200" />

@@ -547,6 +547,17 @@ class ApiClient {
     return data.checkout_url;
   }
 
+  async createCustomCreditCheckout(credits: number): Promise<string> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/buy-custom-credits`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credits }),
+    });
+    if (!res.ok) throw new Error("Failed to create checkout");
+    const data = await res.json();
+    return data.checkout_url;
+  }
+
   async createPaygCheckout(pack: string): Promise<string> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/billing/buy-credits`, {
       method: "POST",

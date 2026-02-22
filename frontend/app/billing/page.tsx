@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import Billing from "@/components/Billing";
@@ -13,6 +13,7 @@ function BillingPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -44,8 +45,8 @@ function BillingPageContent() {
         onProfileClick={() => router.push("/setup")}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-8 w-full">
+        <Header contentRef={contentRef} />
+        <div ref={contentRef} className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-8 w-full">
           <Billing />
         </div>
       </main>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import { AppView } from "@/lib/types";
 import { useAuth } from "./AuthContext";
 
@@ -12,7 +13,9 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ view, setView, collapsed = false, onToggle, onProfileClick }: SidebarProps) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const [showLogout, setShowLogout] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
     { icon: "dashboard", label: "Dashboard", page: "dashboard" },
@@ -23,6 +26,25 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
   ];
 
   const isActive = (page: AppView["page"]) => view.page === page;
+
+  // Close dropdown on outside click or Escape
+  useEffect(() => {
+    if (!showLogout) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowLogout(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowLogout(false);
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [showLogout]);
 
   return (
     <aside className={`hidden md:flex flex-col bg-white border-r border-slate-200/60 z-20 shrink-0 h-screen transition-all duration-300 ease-in-out ${collapsed ? 'w-[60px]' : 'w-52'}`}>
@@ -102,10 +124,25 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
         })}
       </nav>
 
-      {/* User */}
-      <div className={`border-t border-slate-200/60 ${collapsed ? 'p-2' : 'p-4'}`}>
+      {/* User + Logout dropdown */}
+      <div className={`border-t border-slate-200/60 ${collapsed ? 'p-2' : 'p-4'}`} ref={dropdownRef}>
+        {/* Logout dropdown (above avatar) */}
+        {showLogout && (
+          <div className={`mb-2 bg-white rounded-lg shadow-lg border border-slate-200 overflow-hidden ${collapsed ? 'w-40 -translate-x-1/4' : ''}`}>
+            <button
+              onClick={() => {
+                setShowLogout(false);
+                logout();
+              }}
+              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+            >
+              <span className="material-symbols-outlined text-[18px]">logout</span>
+              Log out
+            </button>
+          </div>
+        )}
         <button
-          onClick={onProfileClick}
+          onClick={() => setShowLogout((v) => !v)}
           title={collapsed ? (user?.name || "Profile") : undefined}
           className={`flex items-center w-full rounded-lg hover:bg-slate-50 transition-colors ${
             collapsed ? 'justify-center p-1.5' : 'gap-3 p-2 text-left'

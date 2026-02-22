@@ -1,0 +1,34 @@
+# Stick
+
+> An AI SDR that discovers, researches, matches, and pitches — automatically.
+
+Stick is an AI-powered sales agent that takes your product catalog, autonomously discovers target companies, enriches them with deep web research, matches the best product to each company, and generates personalized pitch decks and outreach emails.
+
+## Features
+
+- **Product Catalog**: Add multiple products with descriptions and ICPs
+- **Company Discovery**: AI agent autonomously finds target companies via ICP-based search
+- **Lead Enrichment**: Deep web research fills in company details, buying signals, and contact info in real time
+- **Product-Company Matching**: AI scores and matches the best product to each lead with reasoning
+- **Pitch Deck Generation**: One-click 7-slide PPTX decks personalized per product-company pair
+- **Outreach Emails**: AI-drafted emails tailored to each match
+- **Usage-Based Billing**: Pay-per-enrichment via Stripe
+
+## API
+
+Base URL: `https://stick.app/api/`
+
+Key endpoints:
+
+- `POST /api/products` — Add a product to the catalog
+- `POST /api/leads` — Add leads (companies) for enrichment
+- `POST /api/leads/discover` — AI-discover companies matching an ICP
+- `GET /api/leads` — List all leads with enrichment data
+- `POST /api/leads/{id}/pitch-deck` — Generate a pitch deck for a lead
+- `GET /api/leads/{id}/emails` — Get drafted outreach emails
+- `WS /ws/updates` — Real-time enrichment updates via WebSocket
+
+## Links
+
+- Website: https://stick.app
+- Documentation: https://stick.app/docs

@@ -39,7 +39,9 @@ export default function Billing() {
   const [billingData, setBillingData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"subscriptions" | "credits">("subscriptions");
+  const [activeTab] = useState<"subscriptions">("subscriptions");
+  const [showAddCredits, setShowAddCredits] = useState(false);
+  const [creditAmount, setCreditAmount] = useState(100);
 
   useEffect(() => {
     api.getBillingCredits()
@@ -61,6 +63,18 @@ export default function Billing() {
     }
   };
 
+  const handleBuyCredits = async () => {
+    if (creditAmount < 100 || creditAmount > 100000) return;
+    setPurchasing("custom-credits");
+    try {
+      const url = await api.createCustomCreditCheckout(creditAmount);
+      window.location.href = url;
+    } catch (err) {
+      console.error("Failed to create checkout:", err);
+      setPurchasing(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -70,10 +84,10 @@ export default function Billing() {
   }
 
   const tiers = billingData?.tiers || {};
-  const packs = billingData?.payg_packs || {};
 
   return (
     <div className="max-w-[1400px] mx-auto w-full flex flex-col gap-8 pb-10">
+      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
           Billing & Credits
@@ -83,68 +97,38 @@ export default function Billing() {
         </p>
       </div>
 
-      {/* Current Balance */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
-        <div className="flex items-center justify-between">
+      {/* Available Credits — centered */}
+      <div className="flex flex-col items-center gap-3 -mt-2">
+        <div className="flex items-center gap-3">
+          <span className="material-symbols-outlined text-4xl text-slate-300 mt-5">
+            account_balance_wallet
+          </span>
           <div>
             <p className="text-sm text-slate-500">Available Credits</p>
-            <p className="text-3xl font-bold text-slate-900 mt-1">
+            <p className="text-5xl font-bold text-slate-900">
               {billingData?.credits_remaining.toLocaleString() || 0} SC
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="material-symbols-outlined text-4xl text-slate-200">
-              account_balance_wallet
-            </span>
-          </div>
         </div>
-      </div>
-
-      {/* Usage Costs */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-6">
-        <h2 className="text-lg font-semibold text-slate-900 mb-4">Usage Costs</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {USAGE_COSTS.map((usage) => (
-            <div key={usage.key} className="bg-white rounded-lg p-4 border border-slate-200">
-              <p className="text-sm font-medium text-slate-900">{usage.name}</p>
-              <p className="text-2xl font-bold text-slate-800 mt-2">{usage.credits} SC</p>
-              <p className="text-xs text-slate-500 mt-1">{usage.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex gap-1 mb-6 bg-slate-100 p-1 rounded-lg w-fit">
         <button
-          onClick={() => setActiveTab("subscriptions")}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-            activeTab === "subscriptions"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-600 hover:text-slate-900"
-          }`}
+          onClick={() => setShowAddCredits(true)}
+          className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg bg-slate-800 hover:bg-slate-700 text-white transition-colors"
         >
-          Subscriptions
-        </button>
-        <button
-          onClick={() => setActiveTab("credits")}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-            activeTab === "credits"
-              ? "bg-white text-slate-900 shadow-sm"
-              : "text-slate-600 hover:text-slate-900"
-          }`}
-        >
-          Buy Credits
+          <span className="material-symbols-outlined text-[18px]">add</span>
+          Add Credits
         </button>
       </div>
+
+      {/* Try a Subscription heading */}
+      <h2 className="text-xl font-semibold text-slate-900 text-center">Try a Subscription</h2>
 
       {/* Subscriptions */}
       {activeTab === "subscriptions" && (
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto w-full">
           {Object.entries(tiers).map(([key, tier]) => {
             const isCurrentSubscription = billingData?.subscription?.active_tier === key;
             const subscriptionStatus = billingData?.subscription?.status;
-            
+
             return (
               <div
                 key={key}
@@ -155,6 +139,9 @@ export default function Billing() {
                 }`}
               >
                 <div>
+                  {key === "growth" && (
+                    <p className="text-xs font-medium text-slate-400 mb-1">Best value</p>
+                  )}
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-slate-900">{tier.label}</h3>
                     {isCurrentSubscription && (
@@ -223,36 +210,78 @@ export default function Billing() {
         </div>
       )}
 
-      {/* Credit Packs */}
-      {activeTab === "credits" && (
-        <div className="grid md:grid-cols-4 gap-6">
-          {Object.entries(packs).map(([key, pack]) => (
-            <div
-              key={key}
-              className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm flex flex-col"
-            >
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-slate-900">{pack.label}</h3>
-                <div className="mt-4">
-                  <span className="text-2xl font-bold text-slate-900">{pack.eur_display}</span>
-                </div>
-                <div className="mt-2 text-sm text-slate-500">
-                  {pack.credits.toLocaleString()} credits
-                </div>
-                <div className="mt-1 text-xs text-slate-400">
-                  {pack.per_credit} per credit
-                </div>
-              </div>
-
-              <button
-                onClick={() => handlePurchase("payg", key)}
-                disabled={purchasing === `payg-${key}`}
-                className="mt-6 w-full py-2.5 px-4 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-white transition-colors disabled:opacity-50"
-              >
-                {purchasing === `payg-${key}` ? "Processing..." : "Buy Now"}
-              </button>
+      {/* Usage Costs */}
+      <div>
+        <h2 className="text-2xl font-semibold text-slate-900 tracking-tight mb-5">Usage Costs</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {USAGE_COSTS.map((usage) => (
+            <div key={usage.key}>
+              <p className="text-base font-medium text-slate-900">{usage.name}</p>
+              <p className="text-2xl font-bold text-slate-800 mt-1">{usage.credits} SC</p>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Add Credits Modal */}
+      {showAddCredits && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-8 shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-slate-900">Add Credits</h3>
+              <button
+                onClick={() => setShowAddCredits(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                How many credits do you want to buy?
+              </label>
+              <input
+                type="number"
+                min={100}
+                max={100000}
+                value={creditAmount}
+                onChange={(e) => setCreditAmount(Number(e.target.value))}
+                className="w-full px-4 py-3 border border-slate-300 rounded-lg text-lg font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-800 focus:border-transparent"
+              />
+              <div className="flex items-center justify-between mt-2">
+                <div>
+                  {creditAmount < 100 && (
+                    <p className="text-xs text-red-500">Minimum 100 credits</p>
+                  )}
+                  {creditAmount > 100000 && (
+                    <p className="text-xs text-red-500">Maximum 100,000 credits</p>
+                  )}
+                </div>
+                {creditAmount >= 100 && creditAmount <= 100000 && (
+                  <p className="text-sm text-slate-500">
+                    Total: €{(creditAmount * 0.10).toFixed(2)}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowAddCredits(false)}
+                className="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBuyCredits}
+                disabled={creditAmount < 100 || creditAmount > 100000 || purchasing === "custom-credits"}
+                className="flex-1 py-2.5 px-4 rounded-lg text-sm font-medium bg-slate-800 hover:bg-slate-700 text-white transition-colors disabled:opacity-50"
+              >
+                {purchasing === "custom-credits" ? "Processing..." : `Buy ${creditAmount} Credits`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -85,7 +85,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
   useEffect(() => { const t = setTimeout(() => setEnrichDone(true), 3000); return () => clearTimeout(t); }, []);
   const handleGenerateDeck = () => { setGeneratingDeck(true); setTimeout(() => { setGeneratingDeck(false); setDemoView("deck"); }, 1500); };
   useEffect(() => { const h = () => setScrolled(window.scrollY > 20); window.addEventListener("scroll", h); return () => window.removeEventListener("scroll", h); }, []);
-  useEffect(() => { api.getGlobalImpact().then(setImpact).catch(() => {}); }, []);
+  useEffect(() => { api.getGlobalImpact().then(setImpact).catch(() => { }); }, []);
 
   const impactObserverRef = useRef<IntersectionObserver | null>(null);
   const impactCallbackRef = (node: HTMLDivElement | null) => {
@@ -173,7 +173,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
               <div className="flex items-center gap-1.5">
                 {isEnriching ? <div className="h-1.5 bg-slate-100 rounded-full w-full max-w-[60px] overflow-hidden"><div className="h-full w-1/2 bg-blue-400 rounded-full animate-pulse" /></div>
                   : row.status === "pending" ? <span className="text-[10px] text-slate-300">—</span>
-                  : <><div className="flex-1 h-1.5 bg-slate-100 rounded-full max-w-[60px]"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${(row.score / 10) * 100}%` }} /></div><span className="text-[10px] font-semibold text-slate-600 tabular-nums">{row.score}</span></>}
+                    : <><div className="flex-1 h-1.5 bg-slate-100 rounded-full max-w-[60px]"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${(row.score / 10) * 100}%` }} /></div><span className="text-[10px] font-semibold text-slate-600 tabular-nums">{row.score}</span></>}
               </div>
               <span className="hidden sm:block">
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${row.status === "complete" || (row.status === "enriching" && enrichDone) ? "bg-emerald-50 text-emerald-700" : row.status === "enriching" ? "bg-blue-50 text-blue-600" : "bg-slate-100 text-slate-400"}`}>
@@ -293,7 +293,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
 
   return (
     <div className="min-h-screen w-full bg-[#f8f9fa] overflow-y-auto">
-      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-white/80 backdrop-blur-lg border-b border-slate-200 shadow-sm" : "bg-transparent"}`}>
+      <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "bg-gradient-to-b from-white/60 to-white/10 backdrop-blur-md border-b border-slate-200 shadow-sm" : "bg-transparent"}`}>
         <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-0">
             <div className="w-15 h-15 rounded-lg flex items-center justify-center">

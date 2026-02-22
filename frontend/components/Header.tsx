@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, RefObject } from "react";
 import { useAuth } from "./AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -12,15 +12,34 @@ const navItems = [
   { icon: "group", label: "LinkedIn", href: "/linkedin-import" },
 ];
 
-export default function Header() {
+interface HeaderProps {
+  contentRef?: RefObject<HTMLDivElement | null>;
+}
+
+export default function Header({ contentRef }: HeaderProps) {
   const { logout, user } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
+  useEffect(() => {
+    const el = contentRef?.current;
+    if (!el) return;
+    const onScroll = () => setScrolled(el.scrollTop > 0);
+    onScroll(); // check initial state
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [contentRef]);
+
   return (
     <>
-      <header className="h-14 flex items-center justify-between px-4 sm:px-6 md:px-8 border-b border-slate-200/60 bg-white shrink-0">
+      <header
+        className={`h-14 flex items-center justify-between px-4 sm:px-6 md:px-8 border-b shrink-0 transition-all duration-300 z-50 relative -mb-14 ${scrolled
+          ? "bg-gradient-to-b from-white/60 to-white/10 backdrop-blur-md border-slate-200/60 shadow-md"
+          : "bg-transparent border-transparent shadow-none"
+          }`}
+      >
         {/* Mobile hamburger */}
         <button
           onClick={() => setDrawerOpen(true)}
@@ -32,14 +51,8 @@ export default function Header() {
         {/* Spacer for desktop (sidebar handles nav) */}
         <div className="hidden md:block" />
 
-        <button
-          onClick={logout}
-          className="text-slate-500 hover:text-red-500 transition-colors flex items-center gap-2 text-sm"
-          title="Logout"
-        >
-          <span className="material-symbols-outlined text-[20px]">logout</span>
-          <span className="hidden sm:inline">Logout</span>
-        </button>
+        {/* Empty spacer — logout moved to sidebar */}
+        <div />
       </header>
 
       {/* Mobile drawer overlay */}
@@ -86,16 +99,14 @@ export default function Header() {
                       router.push(item.href);
                       setDrawerOpen(false);
                     }}
-                    className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors w-full text-left ${
-                      active
-                        ? "bg-slate-100 text-slate-900"
-                        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                    }`}
+                    className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-colors w-full text-left ${active
+                      ? "bg-slate-100 text-slate-900"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      }`}
                   >
                     <span
-                      className={`material-symbols-outlined text-[20px] ${
-                        active ? "text-slate-700" : "text-slate-400"
-                      }`}
+                      className={`material-symbols-outlined text-[20px] ${active ? "text-slate-700" : "text-slate-400"
+                        }`}
                     >
                       {item.icon}
                     </span>
@@ -105,7 +116,7 @@ export default function Header() {
               })}
             </nav>
 
-            {/* User */}
+            {/* User + Logout */}
             <div className="p-4 border-t border-slate-200/60">
               <div className="flex items-center gap-3 p-2">
                 <div className="size-8 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 flex items-center justify-center border border-white shadow-sm text-xs font-bold text-slate-600">
@@ -116,6 +127,16 @@ export default function Header() {
                   <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                 </div>
               </div>
+              <button
+                onClick={() => {
+                  setDrawerOpen(false);
+                  logout();
+                }}
+                className="flex items-center gap-3 px-3 py-2.5 mt-2 text-sm font-medium rounded-lg transition-colors w-full text-left text-red-600 hover:bg-red-50"
+              >
+                <span className="material-symbols-outlined text-[20px]">logout</span>
+                Log out
+              </button>
             </div>
           </aside>
         </div>

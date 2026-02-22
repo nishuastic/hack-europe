@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
 import ProductEdit from "@/components/ProductEdit";
@@ -13,6 +13,7 @@ export default function ProductEditPage() {
   const router = useRouter();
   const params = useParams();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
   const productId = params.id ? parseInt(params.id as string) : undefined;
 
   useEffect(() => {
@@ -46,8 +47,8 @@ export default function ProductEditPage() {
         onProfileClick={() => router.push("/setup")}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-10 w-full">
+        <Header contentRef={contentRef} />
+        <div ref={contentRef} className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-10 w-full">
           <ProductEdit
             productId={productId}
             onBack={() => router.push("/products")}

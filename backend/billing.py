@@ -250,6 +250,48 @@ async def create_tier_checkout(user_id: int, tier: str, session: AsyncSession) -
     return checkout.url or ""
 
 
+CREDIT_PRICE_CENTS = 10  # €0.10 per credit
+
+
+async def create_custom_credit_checkout(
+    user_id: int, credits: int, session: AsyncSession
+) -> str:
+    """Create a Stripe Checkout session for a custom credit amount. Returns checkout URL."""
+    if credits < 100 or credits > 100_000:
+        raise ValueError("Credits must be between 100 and 100,000")
+
+    result = await session.execute(select(UserCredits).where(UserCredits.user_id == user_id))
+    user_credits = result.scalar_one_or_none()
+    customer_id = user_credits.stripe_customer_id if user_credits else None
+
+    checkout = stripe.checkout.Session.create(
+        mode="payment",
+        customer=customer_id or "",
+        line_items=[
+            {
+                "price_data": {
+                    "currency": "eur",
+                    "unit_amount": CREDIT_PRICE_CENTS,
+                    "product_data": {
+                        "name": f"{credits} Stick Credits",
+                        "description": f"One-time purchase of {credits} Stick Credits",
+                    },
+                },
+                "quantity": credits,
+            }
+        ],
+        metadata={
+            "user_id": str(user_id),
+            "type": "payg",
+            "pack": "custom",
+            "credits": str(credits),
+        },
+        success_url="http://localhost:3000/billing?success=true",
+        cancel_url="http://localhost:3000/billing?canceled=true",
+    )
+    return checkout.url or ""
+
+
 async def create_payg_checkout(user_id: int, pack: str, session: AsyncSession) -> str:
     """Create a Stripe Checkout session for a one-time credit pack. Returns checkout URL."""
     if pack not in PAYG_PACKS:

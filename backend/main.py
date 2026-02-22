@@ -27,6 +27,7 @@ from backend.billing import (
     SDR_HOURLY_RATE,
     TIER_PLANS,
     check_credits,
+    create_custom_credit_checkout,
     create_payg_checkout,
     create_tier_checkout,
     deduct_credits,
@@ -1106,6 +1107,10 @@ class PaygCheckoutRequest(BaseModel):
     pack: str  # "100", "500", "2000", "5000"
 
 
+class CustomCreditRequest(BaseModel):
+    credits: int  # 100–100000
+
+
 @app.get("/api/billing/credits")
 async def get_credits(
     session: AsyncSession = Depends(get_session),
@@ -1153,6 +1158,21 @@ async def buy_credits(
     assert user.id is not None
     await ensure_customer(user.id, user.email, user.name, session)
     url = await create_payg_checkout(user.id, body.pack, session)
+    return {"checkout_url": url}
+
+
+@app.post("/api/billing/buy-custom-credits")
+async def buy_custom_credits(
+    body: CustomCreditRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Create a Stripe Checkout session for a custom credit amount (100–100k)."""
+    assert user.id is not None
+    if body.credits < 100 or body.credits > 100_000:
+        raise HTTPException(status_code=400, detail="Credits must be between 100 and 100,000")
+    await ensure_customer(user.id, user.email, user.name, session)
+    url = await create_custom_credit_checkout(user.id, body.credits, session)
     return {"checkout_url": url}
 
 

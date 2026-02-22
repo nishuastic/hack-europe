@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppView } from "@/lib/types";
 import { useAuth } from "@/components/AuthContext";
@@ -69,6 +69,7 @@ export default function AppPage() {
   });
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const goTo = useCallback((v: AppView) => {
     setView(v);
@@ -131,8 +132,8 @@ export default function AppPage() {
     <div className="flex h-screen overflow-hidden w-full">
       <Sidebar view={view} setView={goTo} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} onProfileClick={() => goTo({ page: "onboard" })} />
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa]">
+        <Header contentRef={contentRef} />
+        <div ref={contentRef} className="flex-1 overflow-y-auto bg-[#f8f9fa]">
           {view.page === "dashboard" && (
             <div className="p-6 md:p-8">
               <Dashboard
