@@ -34,6 +34,18 @@ CREDIT_COSTS: dict[UsageEventType, int] = {
     UsageEventType.ICP_RESEARCH: 3,      # 3 SC per customer researched for ICP
 }
 
+# ─── Estimated hours an SDR would spend doing this manually ──────────
+HOURS_SAVED: dict[UsageEventType, float] = {
+    UsageEventType.ENRICHMENT: 2.0,
+    UsageEventType.MATCHING: 1.0,
+    UsageEventType.PITCH_DECK: 3.0,
+    UsageEventType.EMAIL: 0.5,
+    UsageEventType.LINKEDIN_OUTREACH: 0.25,
+    UsageEventType.ICP_RESEARCH: 1.5,
+}
+
+SDR_HOURLY_RATE = 50  # $50/hr average SDR cost
+
 # ─── Tier plans (monthly subscriptions) ──────────────────────────────
 TIER_PLANS: dict[str, dict[str, str | int]] = {
     "starter": {
@@ -92,7 +104,7 @@ PAYG_PACKS: dict[str, dict[str, str | int]] = {
 }
 
 
-async def ensure_customer(user_id: int, email: str, session: AsyncSession) -> UserCredits:
+async def ensure_customer(user_id: int, email: str, name: str, session: AsyncSession) -> UserCredits:
     """Get or create UserCredits row, creating Paid.ai + Stripe customers if needed."""
     result = await session.execute(select(UserCredits).where(UserCredits.user_id == user_id))
     credits = result.scalar_one_or_none()
@@ -118,7 +130,8 @@ async def ensure_customer(user_id: int, email: str, session: AsyncSession) -> Us
     if not credits.paid_customer_id and paid_client:
         try:
             paid_customer = paid_client.customers.create_customer(
-                name=email,
+                name=name or email,
+                email=email,
                 external_id=str(user_id),
             )
             credits.paid_customer_id = paid_customer.id
@@ -193,6 +206,7 @@ def _emit_signal(event_type: UsageEventType, credits: UserCredits, metadata: dic
         UsageEventType.PITCH_DECK: "pitch_deck_generation",
         UsageEventType.EMAIL: "email_generation",
         UsageEventType.LINKEDIN_OUTREACH: "linkedin_outreach",
+        UsageEventType.ICP_RESEARCH: "icp_research",
     }
 
     try:

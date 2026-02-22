@@ -16,6 +16,9 @@ interface AnalyticsData {
   signal_frequency: Record<string, number>;
   score_distribution: Record<string, number>;
   top_icp_score: number | null;
+  hours_saved: number;
+  dollars_saved: number;
+  actions_breakdown: Record<string, number>;
 }
 
 function StatItem({ label, value }: { label: string; value: string | number }) {
@@ -105,7 +108,7 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
       </div>
 
       {/* Stats */}
-      <div className="flex items-end justify-center gap-16">
+      <div className="flex items-end justify-center gap-16 flex-wrap">
         <StatItem label="Total Leads" value={data.total_leads} />
         <div className="h-10 w-px bg-slate-200" />
         <StatItem label="Top ICP" value={topScore} />
@@ -113,6 +116,10 @@ function AnalyticsContent({ onSelectLead }: { onSelectLead?: (leadId: number) =>
         <StatItem label="Avg ICP" value={avgIcp} />
         <div className="h-10 w-px bg-slate-200" />
         <StatItem label="Signals Found" value={totalSignals} />
+        <div className="h-10 w-px bg-slate-200" />
+        <StatItem label="Hours Saved" value={data.hours_saved ?? 0} />
+        <div className="h-10 w-px bg-slate-200" />
+        <StatItem label="$ Saved" value={`$${(data.dollars_saved ?? 0).toLocaleString()}`} />
       </div>
 
       {/* Buying signals + Top opportunities side by side */}
