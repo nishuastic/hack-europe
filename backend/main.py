@@ -783,6 +783,50 @@ async def create_email(
     return email_record
 
 
+@app.get("/api/leads/{lead_id}/emails")
+async def list_emails(
+    lead_id: int,
+    product_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """List all generated email versions for a lead-product pair, newest first."""
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    rows = (
+        await session.execute(
+            select(GeneratedEmail)
+            .where(GeneratedEmail.lead_id == lead_id, GeneratedEmail.product_id == product_id)
+            .order_by(GeneratedEmail.created_at.desc())  # type: ignore[attr-defined]
+        )
+    ).scalars().all()
+    return rows
+
+
+@app.get("/api/leads/{lead_id}/email/latest")
+async def get_latest_email(
+    lead_id: int,
+    product_id: int,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Get the most recent generated email for a lead-product pair."""
+    lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    email = (
+        await session.execute(
+            select(GeneratedEmail)
+            .where(GeneratedEmail.lead_id == lead_id, GeneratedEmail.product_id == product_id)
+            .order_by(GeneratedEmail.created_at.desc())  # type: ignore[attr-defined]
+        )
+    ).scalars().first()
+    if not email:
+        raise HTTPException(status_code=404, detail="No email found")
+    return email
+
+
 # ─── LinkedIn Import ──────────────────────────────────────────────────
 
 

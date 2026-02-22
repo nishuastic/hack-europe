@@ -56,6 +56,10 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
     contact_name: string;
     contact_role: string;
   } | null>(null);
+  const [emailVersions, setEmailVersions] = useState<
+    { id: number; subject: string; body: string; contact_name: string; contact_role: string; created_at: string }[]
+  >([]);
+  const [versionIndex, setVersionIndex] = useState(0);
 
   useEffect(() => {
     api.getLead(leadId)
@@ -63,6 +67,25 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
       .catch((err) => {
         console.error("Failed to load lead:", err);
       });
+  }, [leadId]);
+
+  // Load existing email versions on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const matches = await api.getMatches(leadId);
+        if (matches.length === 0) return;
+        const productId = matches[0].product_id;
+        const versions = await api.listEmails(leadId, productId);
+        if (versions.length > 0) {
+          setEmailVersions(versions);
+          setVersionIndex(0);
+          setEmailContent(versions[0]);
+        }
+      } catch {
+        // no versions yet — that's fine
+      }
+    })();
   }, [leadId]);
 
   const handleReEnrich = async () => {
@@ -121,6 +144,8 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
       const productId = matches.length > 0 ? matches[0].product_id : 1;
       const result = await api.generateEmail(leadId, productId);
       setEmailContent(result);
+      setEmailVersions((prev) => [{ ...result, id: Date.now(), created_at: new Date().toISOString() }, ...prev]);
+      setVersionIndex(0);
       const updated = await api.getLead(leadId);
       setLead(updated);
     } catch (err) {
@@ -288,6 +313,35 @@ export default function LeadDetail({ leadId, onBack, onOpenPitchEditor }: LeadDe
                 Generated Email
               </label>
               <div className="flex items-center gap-3">
+                {emailVersions.length > 1 && (
+                  <div className="flex items-center gap-1.5 mr-2">
+                    <button
+                      onClick={() => {
+                        const next = Math.min(versionIndex + 1, emailVersions.length - 1);
+                        setVersionIndex(next);
+                        setEmailContent(emailVersions[next]);
+                      }}
+                      disabled={versionIndex >= emailVersions.length - 1}
+                      className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+                    </button>
+                    <span className="text-[11px] text-slate-400 tabular-nums">
+                      v{emailVersions.length - versionIndex} of {emailVersions.length}
+                    </span>
+                    <button
+                      onClick={() => {
+                        const next = Math.max(versionIndex - 1, 0);
+                        setVersionIndex(next);
+                        setEmailContent(emailVersions[next]);
+                      }}
+                      disabled={versionIndex <= 0}
+                      className="p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-30 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                    </button>
+                  </div>
+                )}
                 <button
                   onClick={handleGenerateEmail}
                   disabled={generatingEmail}
