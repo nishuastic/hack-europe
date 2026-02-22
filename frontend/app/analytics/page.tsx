@@ -39,10 +39,11 @@ export default function AnalyticsPage() {
         }}
         collapsed={sidebarCollapsed}
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onProfileClick={() => router.push("/setup")}
       />
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-4 sm:p-6 md:p-8 w-full">
+        <div className="flex-1 overflow-y-auto bg-[#f8f9fa] p-6 md:p-8 w-full">
           <Analytics onSelectLead={(id) => router.push(`/app?leadId=${id}`)} />
         </div>
       </main>

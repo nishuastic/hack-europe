@@ -58,14 +58,14 @@ export default function Products({ onEdit }: ProductsProps) {
   };
 
   return (
-    <div className="w-full flex flex-col gap-8 pb-10">
+    <div className="max-w-[1400px] mx-auto w-full flex flex-col gap-8 pb-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">
+          <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
             Products &amp; Services
           </h1>
-          <p className="text-slate-500 text-sm md:text-base max-w-2xl leading-relaxed">
+          <p className="text-slate-500 mt-1 text-sm">
             Manage your product catalog. The AI uses these to match and generate
             tailored pitch decks.
           </p>

@@ -136,9 +136,9 @@ export default function Dashboard({ onSelectRun }: DashboardProps) {
   };
 
   return (
-    <div className="w-full flex flex-col gap-8">
+    <div className="max-w-[1400px] mx-auto w-full flex flex-col gap-8 pb-10">
       {/* Title */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">
             Generation Runs
@@ -150,7 +150,7 @@ export default function Dashboard({ onSelectRun }: DashboardProps) {
         <button
           onClick={handleGenerateClick}
           disabled={generating}
-          className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2 disabled:opacity-50"
+          className="px-5 py-2.5 rounded-lg bg-slate-900 text-white font-medium text-sm hover:opacity-90 transition-all shadow-md flex items-center gap-2 disabled:opacity-50 shrink-0"
         >
           <span className="material-symbols-outlined text-[18px]">
             {generating ? "hourglass_empty" : "bolt"}
