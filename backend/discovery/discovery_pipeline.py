@@ -6,10 +6,11 @@ from typing import Any
 
 from sqlmodel import select
 
+from backend.billing import CREDIT_COSTS, check_credits, deduct_credits
 from backend.db import async_session
 from backend.discovery.icp_agent import run_discovery_agent
 from backend.enrichment.pipeline import enrich_leads
-from backend.models import CompanyProfile, EnrichmentStatus, GenerationRun, Lead, Product
+from backend.models import CompanyProfile, EnrichmentStatus, GenerationRun, Lead, Product, UsageEventType
 
 logger = logging.getLogger(__name__)
 
@@ -147,10 +148,28 @@ async def run_discovery(
             "generation_run_id": generation_run_id,
         })
 
-        # Auto-enrich discovered leads
+        # Auto-enrich discovered leads — deduct enrichment credits first
         if lead_ids:
-            logger.info(f"Auto-enriching {len(lead_ids)} discovered leads")
-            asyncio.create_task(enrich_leads(lead_ids, ws_manager))
+            async with async_session() as credit_session:
+                has_credits = await check_credits(
+                    user_id, UsageEventType.ENRICHMENT, credit_session, quantity=len(lead_ids)
+                )
+                if has_credits:
+                    await deduct_credits(
+                        user_id, UsageEventType.ENRICHMENT, credit_session,
+                        {"lead_ids": lead_ids},
+                        quantity=len(lead_ids),
+                    )
+                    sc_used = len(lead_ids) * CREDIT_COSTS[UsageEventType.ENRICHMENT]
+                    logger.info(f"Auto-enriching {len(lead_ids)} discovered leads (deducted {sc_used} SC)")
+                    asyncio.create_task(enrich_leads(lead_ids, ws_manager))
+                else:
+                    logger.warning(f"Insufficient credits to auto-enrich {len(lead_ids)} leads — skipping enrichment")
+                    await ws_manager.broadcast({
+                        "type": "enrichment_skipped",
+                        "reason": "insufficient_credits",
+                        "lead_ids": lead_ids,
+                    })
 
     except Exception as e:
         logger.exception("Discovery pipeline failed")

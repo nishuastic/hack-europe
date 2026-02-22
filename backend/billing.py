@@ -158,9 +158,11 @@ async def ensure_customer(user_id: int, email: str, name: str, session: AsyncSes
     return credits
 
 
-async def check_credits(user_id: int, event_type: UsageEventType, session: AsyncSession) -> bool:
+async def check_credits(
+    user_id: int, event_type: UsageEventType, session: AsyncSession, quantity: int = 1
+) -> bool:
     """Check if the user has enough credits for the action."""
-    cost = CREDIT_COSTS[event_type]
+    cost = CREDIT_COSTS[event_type] * quantity
     result = await session.execute(select(UserCredits).where(UserCredits.user_id == user_id))
     credits = result.scalar_one_or_none()
     if credits is None:
@@ -173,9 +175,10 @@ async def deduct_credits(
     event_type: UsageEventType,
     session: AsyncSession,
     metadata: dict | None = None,
+    quantity: int = 1,
 ) -> int:
     """Deduct credits and record usage event. Returns remaining credits."""
-    cost = CREDIT_COSTS[event_type]
+    cost = CREDIT_COSTS[event_type] * quantity
     result = await session.execute(select(UserCredits).where(UserCredits.user_id == user_id))
     credits = result.scalar_one_or_none()
     if credits is None or credits.credits_remaining < cost:

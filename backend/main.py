@@ -435,13 +435,14 @@ async def learn_icp(
         raise HTTPException(status_code=400, detail="Product has no current_clients to learn from")
 
     # Credit check: 3 credits per customer
-    total_cost = len(product.current_clients) * 3
-    if not await check_credits(user.id, UsageEventType.ICP_RESEARCH, session):
-        raise HTTPException(status_code=402, detail="Insufficient credits for ICP research")
+    total_cost = len(product.current_clients) * CREDIT_COSTS[UsageEventType.ICP_RESEARCH]
+    if not await check_credits(user.id, UsageEventType.ICP_RESEARCH, session, quantity=len(product.current_clients)):
+        raise HTTPException(status_code=402, detail=f"Insufficient credits for ICP research (need {total_cost} SC)")
 
     await deduct_credits(
         user.id, UsageEventType.ICP_RESEARCH, session,
         {"product_id": product_id, "customers": len(product.current_clients)},
+        quantity=len(product.current_clients),
     )
 
     from backend.icp.icp_pipeline import run_icp_learning
@@ -698,6 +699,20 @@ async def import_leads(
             run.lead_count = (run.lead_count or 0) + len(lead_ids)
             session.add(run)
             await session.commit()
+
+    # Deduct enrichment credits for all leads (5 SC each)
+    assert user.id is not None
+    if not await check_credits(user.id, UsageEventType.ENRICHMENT, session, quantity=len(lead_ids)):
+        enrich_cost = len(lead_ids) * CREDIT_COSTS[UsageEventType.ENRICHMENT]
+        raise HTTPException(
+            status_code=402,
+            detail=f"Insufficient credits (need {enrich_cost} SC for {len(lead_ids)} enrichments)",
+        )
+    await deduct_credits(
+        user.id, UsageEventType.ENRICHMENT, session,
+        {"lead_ids": lead_ids},
+        quantity=len(lead_ids),
+    )
 
     # Fire-and-forget enrichment
     asyncio.create_task(enrich_leads(lead_ids, manager))
