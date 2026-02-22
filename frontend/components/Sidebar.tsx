@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
 import { AppView } from "@/lib/types";
 import { useAuth } from "./AuthContext";
 
@@ -11,22 +10,18 @@ interface SidebarProps {
   onToggle?: () => void;
 }
 
+const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
+  { icon: "dashboard", label: "Dashboard", page: "dashboard" },
+  { icon: "inventory_2", label: "Products", page: "products" },
+  { icon: "group", label: "LinkedIn", page: "linkedin-import" },
+  { icon: "settings", label: "Setup", page: "onboard" },
+];
+
 export default function Sidebar({ view, setView, collapsed = false, onToggle }: SidebarProps) {
   const { user } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
-    { icon: "dashboard", label: "Dashboard", page: "dashboard" },
-    { icon: "inventory_2", label: "Products", page: "products" },
-    { icon: "wallet", label: "Billing", page: "billing" },
-    { icon: "group", label: "LinkedIn", page: "linkedin-import" },
-  ];
-
-  const isActive = (href: string) => pathname === href;
 
   return (
-    <aside className={`bg-white border-r border-slate-200/60 flex flex-col z-20 hidden md:flex shrink-0 h-screen transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
+    <aside className={`bg-white border-r border-slate-200/60 flex-col z-20 hidden md:flex shrink-0 h-screen transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
       {/* Logo & Toggle */}
       <div className="px-4 py-5 flex items-center gap-3 relative">
         <div className="size-8 text-black flex items-center justify-center bg-primary/5 rounded-lg border border-primary/10 shrink-0">
@@ -54,11 +49,11 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-hide">
         {navItems.map((item) => {
-          const active = isActive(item.page);
+          const active = view.page === item.page;
           return (
             <button
               key={item.page}
-              onClick={() => router.push(item.page)}
+              onClick={() => setView({ page: item.page } as AppView)}
               className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors group w-full text-left ${
                 active
                   ? "bg-slate-100 text-slate-900"
@@ -77,9 +72,7 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
               {!collapsed && item.label}
             </button>
           );
-        }        )}
-
-        {/* User */}
+        })}
       </nav>
 
       {/* User */}
