@@ -629,6 +629,19 @@ class ApiClient {
     return res.json();
   }
 
+  async discoverMore(
+    runId: number,
+    maxCompanies: number = 10,
+  ): Promise<{ status: string; max_companies: number; generation_run_id: number }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/discovery/run/${runId}/more`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ max_companies: maxCompanies }),
+    });
+    if (!res.ok) throw new Error("Failed to start discovery");
+    return res.json();
+  }
+
   async getLinkedInMatches(leadId?: number): Promise<LinkedInMatch[]> {
     const params = leadId ? `?lead_id=${leadId}` : "";
     const res = await this.fetchWithAuth(`${API_BASE}/api/linkedin/matches${params}`);

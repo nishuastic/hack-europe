@@ -46,7 +46,8 @@ Hard requirements:
 - Professional, warm, direct. Never pushy. No hypey buzzwords.
 
 Personalization rules (must follow):
-- Use 1–2 specific details from company_profile (initiative, product launch, hiring, geo expansion, funding, tech stack, customer segment, compliance, etc.).
+- Use 1–2 specific details from company_profile (initiative, product launch, hiring, geo expansion, funding,
+  tech stack, customer segment, compliance, etc.).
 - If company_profile lacks specifics, do NOT invent. Use a safe, role-based observation instead.
 - Make the relevance explicit: tie the detail → likely priority/challenge → your value.
 

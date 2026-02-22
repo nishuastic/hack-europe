@@ -56,6 +56,9 @@ export default function GenerationRunDetail({
   const [showAddModal, setShowAddModal] = useState(false);
   const [addText, setAddText] = useState("");
   const [adding, setAdding] = useState(false);
+  const [showDiscoverModal, setShowDiscoverModal] = useState(false);
+  const [discoverCount, setDiscoverCount] = useState(10);
+  const [discovering, setDiscovering] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -169,8 +172,16 @@ export default function GenerationRunDetail({
         </div>
         <div className="flex gap-3">
           <button
+            onClick={() => setShowDiscoverModal(true)}
+            disabled={discovering}
+            className="bg-primary hover:bg-primary/90 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2"
+          >
+            <span className="material-symbols-outlined text-[18px]">travel_explore</span>
+            {discovering ? "Discovering…" : "Discover more"}
+          </button>
+          <button
             onClick={() => setShowAddModal(true)}
-            className="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2"
+            className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-2 rounded-md text-sm font-medium shadow-sm transition-all flex items-center gap-2"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             Add companies
@@ -425,6 +436,57 @@ export default function GenerationRunDetail({
           </div>
         </div>
       </div>
+
+      {/* Discover more modal */}
+      {showDiscoverModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">
+              Discover more companies
+            </h2>
+            <p className="text-sm text-slate-500 mb-4">
+              Claude will search for new companies using the same ICP and append them to this run.
+            </p>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              How many companies to find
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={50}
+              value={discoverCount}
+              onChange={(e) => setDiscoverCount(Math.max(1, Math.min(50, Number(e.target.value))))}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+            />
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                onClick={() => setShowDiscoverModal(false)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={discovering}
+                onClick={async () => {
+                  setDiscovering(true);
+                  setShowDiscoverModal(false);
+                  try {
+                    await api.discoverMore(runId, discoverCount);
+                    setRun((prev) => prev ? { ...prev, status: "running" } : prev);
+                  } catch {
+                    // ignore
+                  } finally {
+                    setDiscovering(false);
+                  }
+                }}
+                className="bg-primary hover:bg-primary/90 disabled:opacity-50 text-white px-4 py-2 rounded-md text-sm font-medium transition-all"
+              >
+                Start discovery
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add companies modal */}
       {showAddModal && (

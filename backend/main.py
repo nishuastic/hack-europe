@@ -641,6 +641,35 @@ async def run_discovery_endpoint(
     }
 
 
+@app.post("/api/discovery/run/{run_id}/more")
+async def discover_more_for_run(
+    run_id: int,
+    body: DiscoveryRequest,
+    session: AsyncSession = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    """Append more discovered companies to an existing GenerationRun."""
+    assert user.id is not None
+
+    run = await session.get(GenerationRun, run_id)
+    if run is None or run.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Mark the run as running again
+    run.status = "running"
+    session.add(run)
+    await session.commit()
+
+    # Use run's original product_ids so discovery stays consistent
+    product_ids = run.product_ids or None
+    asyncio.create_task(run_discovery(product_ids, body.max_companies, manager, user.id, generation_run_id=run_id))
+    return {
+        "status": "discovery_started",
+        "max_companies": body.max_companies,
+        "generation_run_id": run_id,
+    }
+
+
 # ─── Lead Import + List ───────────────────────────────────────────────
 
 
