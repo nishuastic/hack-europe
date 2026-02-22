@@ -14,6 +14,7 @@ const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
   { icon: "dashboard", label: "Dashboard", page: "dashboard" },
   { icon: "inventory_2", label: "Products", page: "products" },
   { icon: "group", label: "LinkedIn", page: "linkedin-import" },
+  { icon: "wallet", label: "Billing", page: "billing" },
   { icon: "settings", label: "Setup", page: "onboard" },
 ];
 
