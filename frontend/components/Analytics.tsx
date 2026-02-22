@@ -1,7 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, AnalyticsData } from "@/lib/api";
+import { api } from "@/lib/api";
+
+interface AnalyticsData {
+  total_leads: number;
+  enriched_count: number;
+  industry_breakdown: Record<string, number>;
+  avg_icp_score_by_product: Record<string, number>;
+  top_opportunities: {
+    lead_id: number;
+    company_name: string;
+    product_name: string;
+    icp_score: number;
+    conversion_likelihood: string | null;
+  }[];
+  signal_frequency: Record<string, number>;
+  score_distribution: Record<string, number>;
+}
 
 function StatCard({ label, value, icon }: { label: string; value: string | number; icon: string }) {
   return (
@@ -17,7 +33,7 @@ function StatCard({ label, value, icon }: { label: string; value: string | numbe
   );
 }
 
-function BarChart({ data, color = "bg-blue-500" }: { data: Record<string, number>; color?: string }) {
+function BarChart({ data }: { data: Record<string, number> }) {
   const entries = Object.entries(data);
   const max = Math.max(...entries.map(([, v]) => v), 1);
 
@@ -37,7 +53,7 @@ function BarChart({ data, color = "bg-blue-500" }: { data: Record<string, number
             </span>
             <div className="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
               <div
-                className={`h-full ${color} rounded-full transition-all duration-500`}
+                className="h-full bg-slate-900 rounded-full transition-all duration-500"
                 style={{ width: `${(value / max) * 100}%` }}
               />
             </div>
@@ -52,10 +68,10 @@ function conversionBadge(likelihood: string | null) {
   if (!likelihood) return <span className="text-xs text-slate-400">-</span>;
   const cls =
     likelihood === "high"
-      ? "bg-green-100 text-green-700"
+      ? "bg-slate-900 text-white"
       : likelihood === "medium"
-        ? "bg-yellow-100 text-yellow-700"
-        : "bg-red-100 text-red-700";
+        ? "bg-slate-200 text-slate-800"
+        : "bg-slate-100 text-slate-500";
   return (
     <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${cls}`}>
       {likelihood.charAt(0).toUpperCase() + likelihood.slice(1)}
@@ -70,7 +86,7 @@ function AnalyticsContent() {
   useEffect(() => {
     api
       .getAnalytics()
-      .then(setData)
+      .then((d) => setData(d as AnalyticsData))
       .catch((err) => console.error("Failed to load analytics:", err))
       .finally(() => setLoading(false));
   }, []);
@@ -92,6 +108,11 @@ function AnalyticsContent() {
     );
   }
 
+  const topScore =
+    data.top_opportunities.length > 0
+      ? `${data.top_opportunities[0].icp_score}/100`
+      : "-";
+
   return (
     <div className="max-w-[1400px] mx-auto flex flex-col gap-6">
       {/* Header */}
@@ -109,15 +130,7 @@ function AnalyticsContent() {
           value={Object.keys(data.industry_breakdown).length}
           icon="category"
         />
-        <StatCard
-          label="Top Score"
-          value={
-            data.top_opportunities.length > 0
-              ? `${data.top_opportunities[0].match_score}/10`
-              : "-"
-          }
-          icon="star"
-        />
+        <StatCard label="Top ICP Score" value={topScore} icon="star" />
       </div>
 
       {/* Charts row */}
@@ -128,25 +141,25 @@ function AnalyticsContent() {
             <span className="material-symbols-outlined text-[18px] text-slate-500">pie_chart</span>
             Industry Breakdown
           </h3>
-          <BarChart data={data.industry_breakdown} color="bg-blue-500" />
+          <BarChart data={data.industry_breakdown} />
         </div>
 
-        {/* Score distribution */}
+        {/* ICP Score distribution */}
         <div className="bg-white border border-slate-200 rounded-lg p-5">
           <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-[18px] text-slate-500">bar_chart</span>
-            Score Distribution
+            ICP Score Distribution
           </h3>
-          <BarChart data={data.score_distribution} color="bg-emerald-500" />
+          <BarChart data={data.score_distribution} />
         </div>
 
-        {/* Avg score by product */}
+        {/* Avg ICP score by product */}
         <div className="bg-white border border-slate-200 rounded-lg p-5">
           <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
             <span className="material-symbols-outlined text-[18px] text-slate-500">inventory_2</span>
-            Avg Score by Product
+            Avg ICP Score by Product
           </h3>
-          <BarChart data={data.avg_match_score_by_product} color="bg-violet-500" />
+          <BarChart data={data.avg_icp_score_by_product} />
         </div>
 
         {/* Buying signal frequency */}
@@ -155,7 +168,7 @@ function AnalyticsContent() {
             <span className="material-symbols-outlined text-[18px] text-slate-500">sensors</span>
             Buying Signal Frequency
           </h3>
-          <BarChart data={data.signal_frequency} color="bg-amber-500" />
+          <BarChart data={data.signal_frequency} />
         </div>
       </div>
 
@@ -172,7 +185,7 @@ function AnalyticsContent() {
             <table className="min-w-full divide-y divide-slate-100">
               <thead>
                 <tr>
-                  {["Company", "Product", "Score", "Conversion"].map((h) => (
+                  {["Company", "Product", "ICP Score", "Conversion"].map((h) => (
                     <th key={h} className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wide">
                       {h}
                     </th>
@@ -185,8 +198,8 @@ function AnalyticsContent() {
                     <td className="px-4 py-3 text-sm font-medium text-slate-900">{opp.company_name}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{opp.product_name}</td>
                     <td className="px-4 py-3">
-                      <span className={`text-sm font-semibold ${opp.match_score >= 7 ? "text-green-600" : opp.match_score >= 4 ? "text-yellow-600" : "text-red-600"}`}>
-                        {opp.match_score}/10
+                      <span className="text-sm font-semibold text-slate-900">
+                        {opp.icp_score}/100
                       </span>
                     </td>
                     <td className="px-4 py-3">{conversionBadge(opp.conversion_likelihood)}</td>

@@ -3,6 +3,7 @@
 import json
 import logging
 import re
+from difflib import SequenceMatcher
 
 import anthropic
 from sqlalchemy import func
@@ -24,6 +25,69 @@ def _get_claude_client() -> anthropic.AsyncAnthropic:
     return _aclient
 
 
+def _normalize_industry(name: str) -> str:
+    """Normalize an industry string for grouping: lowercase, strip slashes, collapse whitespace."""
+    name = name.strip().lower()
+    # Split on common delimiters and take unique meaningful tokens
+    tokens = re.split(r"[/,&]+", name)
+    tokens = [t.strip() for t in tokens if t.strip()]
+    # Rejoin sorted tokens for canonical form
+    return " / ".join(tokens)
+
+
+def _fuzzy_group_industries(raw: dict[str, int], threshold: float = 0.6) -> dict[str, int]:
+    """Group industry labels that are similar using fuzzy matching.
+
+    Uses token overlap + SequenceMatcher. The label with the highest count
+    in a cluster becomes the canonical name.
+    """
+    # First pass: normalize
+    normalized: dict[str, list[tuple[str, int]]] = {}
+    for label, count in raw.items():
+        norm = _normalize_industry(label)
+        normalized.setdefault(norm, []).append((label, count))
+
+    # Merge exact-normalized groups
+    interim: dict[str, int] = {}
+    canonical_labels: dict[str, str] = {}
+    for norm, entries in normalized.items():
+        total = sum(c for _, c in entries)
+        # Pick the shortest original label as canonical (cleaner)
+        best_label = min(entries, key=lambda e: len(e[0]))[0]
+        interim[norm] = total
+        canonical_labels[norm] = best_label
+
+    # Second pass: fuzzy merge remaining similar groups
+    norms = list(interim.keys())
+    merged: dict[str, int] = {}
+    used: set[int] = set()
+
+    for i, n1 in enumerate(norms):
+        if i in used:
+            continue
+        cluster_count = interim[n1]
+        cluster_label = canonical_labels[n1]
+        for j in range(i + 1, len(norms)):
+            if j in used:
+                continue
+            n2 = norms[j]
+            # Token overlap check
+            tokens1 = set(n1.split())
+            tokens2 = set(n2.split())
+            overlap = len(tokens1 & tokens2) / max(len(tokens1 | tokens2), 1)
+            seq_ratio = SequenceMatcher(None, n1, n2).ratio()
+            if overlap >= threshold or seq_ratio >= threshold:
+                cluster_count += interim[n2]
+                # Keep the shorter/cleaner label
+                if len(canonical_labels[n2]) < len(cluster_label):
+                    cluster_label = canonical_labels[n2]
+                used.add(j)
+        merged[cluster_label] = cluster_count
+        used.add(i)
+
+    return merged
+
+
 async def get_analytics(session: AsyncSession, user_id: int) -> dict:
     """Compute analytics dashboard data from SQL aggregations for a specific user."""
     # Total leads and enriched count for this user
@@ -35,43 +99,43 @@ async def get_analytics(session: AsyncSession, user_id: int) -> dict:
     )
     enriched_count = enriched_result.scalar() or 0
 
-    # Industry breakdown
+    # Industry breakdown (with fuzzy grouping)
     industry_rows = await session.execute(
         select(Lead.industry, func.count(Lead.id))  # type: ignore[arg-type]
         .where(Lead.industry.isnot(None), Lead.user_id == user_id)  # type: ignore[union-attr]
         .group_by(Lead.industry)
     )
-    industry_breakdown = {row[0]: row[1] for row in industry_rows.all()}
+    raw_industry_breakdown = {row[0]: row[1] for row in industry_rows.all()}
+    industry_breakdown = _fuzzy_group_industries(raw_industry_breakdown)
 
-    # Average match score by product
+    # Average ICP score by product (using Lead.icp_fit_score via ProductMatch join)
     avg_score_rows = await session.execute(
-        select(Product.name, func.avg(ProductMatch.match_score))
-        .join(Product, Product.id == ProductMatch.product_id)  # type: ignore[arg-type]
+        select(Product.name, func.avg(Lead.icp_fit_score))
+        .join(ProductMatch, Product.id == ProductMatch.product_id)  # type: ignore[arg-type]
         .join(Lead, Lead.id == ProductMatch.lead_id)  # type: ignore[arg-type]
-        .where(Lead.user_id == user_id)
+        .where(Lead.user_id == user_id, Lead.icp_fit_score.isnot(None))  # type: ignore[union-attr]
         .group_by(Product.name)
     )
-    avg_match_score_by_product = {row[0]: round(float(row[1]), 2) for row in avg_score_rows.all()}
+    avg_icp_score_by_product = {row[0]: round(float(row[1]), 1) for row in avg_score_rows.all()}
 
-    # Top 5 opportunities by match score
+    # Top 5 opportunities by ICP fit score
     top_rows = await session.execute(
-        select(ProductMatch, Lead.company_name, Product.name)
-        .join(Lead, Lead.id == ProductMatch.lead_id)  # type: ignore[arg-type]
+        select(Lead, Product.name, ProductMatch.conversion_likelihood)
+        .join(ProductMatch, Lead.id == ProductMatch.lead_id)  # type: ignore[arg-type]
         .join(Product, Product.id == ProductMatch.product_id)  # type: ignore[arg-type]
-        .where(Lead.user_id == user_id)
-        .order_by(ProductMatch.match_score.desc())  # type: ignore[attr-defined]
+        .where(Lead.user_id == user_id, Lead.icp_fit_score.isnot(None))  # type: ignore[union-attr]
+        .order_by(Lead.icp_fit_score.desc())  # type: ignore[union-attr]
         .limit(5)
     )
     top_opportunities = []
     for row in top_rows.all():
-        match_obj, company_name, product_name = row
+        lead, product_name, conversion_likelihood = row
         top_opportunities.append({
-            "lead_id": match_obj.lead_id,
-            "company_name": company_name,
-            "product_id": match_obj.product_id,
+            "lead_id": lead.id,
+            "company_name": lead.company_name,
             "product_name": product_name,
-            "match_score": match_obj.match_score,
-            "conversion_likelihood": match_obj.conversion_likelihood,
+            "icp_score": lead.icp_fit_score,
+            "conversion_likelihood": conversion_likelihood,
         })
 
     # Buying signal frequency — count signals across all leads
@@ -87,26 +151,29 @@ async def get_analytics(session: AsyncSession, user_id: int) -> dict:
             sig_type = sig.get("signal_type", "unknown") if isinstance(sig, dict) else "unknown"
             signal_frequency[sig_type] = signal_frequency.get(sig_type, 0) + 1
 
-    # Score distribution buckets
-    score_dist: dict[str, int] = {"1-3": 0, "4-6": 0, "7-10": 0}
+    # ICP score distribution buckets (0-100 scale)
+    score_dist: dict[str, int] = {"0-20": 0, "21-40": 0, "41-60": 0, "61-80": 0, "81-100": 0}
     all_scores = await session.execute(
-        select(ProductMatch.match_score)
-        .join(Lead, Lead.id == ProductMatch.lead_id)  # type: ignore[arg-type]
-        .where(Lead.user_id == user_id)
+        select(Lead.icp_fit_score)
+        .where(Lead.user_id == user_id, Lead.icp_fit_score.isnot(None))  # type: ignore[union-attr]
     )
     for (score,) in all_scores.all():
-        if score <= 3:
-            score_dist["1-3"] += 1
-        elif score <= 6:
-            score_dist["4-6"] += 1
+        if score <= 20:
+            score_dist["0-20"] += 1
+        elif score <= 40:
+            score_dist["21-40"] += 1
+        elif score <= 60:
+            score_dist["41-60"] += 1
+        elif score <= 80:
+            score_dist["61-80"] += 1
         else:
-            score_dist["7-10"] += 1
+            score_dist["81-100"] += 1
 
     return {
         "total_leads": total_leads,
         "enriched_count": enriched_count,
         "industry_breakdown": industry_breakdown,
-        "avg_match_score_by_product": avg_match_score_by_product,
+        "avg_icp_score_by_product": avg_icp_score_by_product,
         "top_opportunities": top_opportunities,
         "signal_frequency": signal_frequency,
         "score_distribution": score_dist,
