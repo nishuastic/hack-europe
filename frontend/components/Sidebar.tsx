@@ -19,7 +19,7 @@ export default function Sidebar({ view, setView }: SidebarProps) {
     <aside className="w-64 bg-white border-r border-slate-200/60 flex flex-col z-20 hidden md:flex shrink-0 h-screen">
       {/* Logo */}
       <div className="px-6 py-5 flex items-center gap-3">
-        <div className="size-8 text-primary flex items-center justify-center bg-primary/5 rounded-lg border border-primary/10">
+        <div className="size-8 text-black flex items-center justify-center bg-primary/5 rounded-lg border border-primary/10">
           <span className="material-symbols-outlined text-[20px]">
             auto_graph
           </span>

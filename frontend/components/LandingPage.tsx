@@ -1,19 +1,123 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface LandingPageProps {
   onGetStarted: () => void;
 }
 
+// Custom hook for scroll animations
+const useScrollAnimation = (threshold = 0.3) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { threshold }
+    );
+
+    if (ref.current) {
+      observer.observe(ref.current);
+    }
+
+    return () => {
+      if (ref.current) {
+        observer.unobserve(ref.current);
+      }
+    };
+  }, [threshold]);
+
+  return { ref, isVisible };
+};
+
 export default function LandingPage({ onGetStarted }: LandingPageProps) {
   const [scrolled, setScrolled] = useState(false);
+  const [leadsEnriched, setLeadsEnriched] = useState(0);
+  const [productsMatched, setProductsMatched] = useState(0);
+  const [decksGenerated, setDecksGenerated] = useState(0);
+  const [hasAnimated, setHasAnimated] = useState(false);
+  const statsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  // Intersection Observer to detect when stats section is visible
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasAnimated) {
+          setHasAnimated(true);
+          // Start counter animation
+          animateCounter(0, 247, setLeadsEnriched, 1500);
+          animateCounter(0, 89, setProductsMatched, 1500);
+          animateCounter(0, 34, setDecksGenerated, 1500);
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    if (statsRef.current) {
+      observer.observe(statsRef.current);
+    }
+
+    return () => {
+      if (statsRef.current) {
+        observer.unobserve(statsRef.current);
+      }
+    };
+  }, [hasAnimated]);
+
+  const animateCounter = (
+    start: number,
+    end: number,
+    setter: (value: number) => void,
+    duration: number
+  ) => {
+    const startTime = Date.now();
+    const increment = end / (duration / 16); // ~60fps
+
+    const counter = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const current = Math.floor(start + (end - start) * progress);
+      setter(current);
+
+      if (progress < 1) {
+        requestAnimationFrame(counter);
+      }
+    };
+
+    requestAnimationFrame(counter);
+  };
+
+  const [typedText, setTypedText] = useState("");
+  const fullText = "Everything your sales team\n needs in one place.";
+
+  // Scroll animations
+  const heroRef = useScrollAnimation();
+  const dashboardRef = useScrollAnimation();
+  const logosRef = useScrollAnimation();
+  const featuresRef = useScrollAnimation();
+  const howItWorksRef = useScrollAnimation();
+  const statsCardRef = useScrollAnimation();
+  const ctaRef = useScrollAnimation();
+
+  useEffect(() => {
+    if (featuresRef.isVisible && typedText.length < fullText.length) {
+      const timeout = setTimeout(() => {
+        setTypedText(fullText.slice(0, typedText.length + 1));
+      }, 50); // Adjust speed here
+      return () => clearTimeout(timeout);
+    }
+  }, [featuresRef.isVisible, typedText, fullText]);
 
   return (
     <div className="min-h-screen w-full bg-[#f8f9fa] overflow-y-auto">
@@ -25,14 +129,19 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             : "bg-transparent"
         }`}
       >
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center">
-              <span className="material-symbols-outlined text-lg text-white">
-                auto_awesome
-              </span>
+        <div className="max-w-6xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <div className="w-15 h-15 rounded-lg flex items-center justify-center">
+              <span
+                className="w-14 h-14 bg-amber-800"
+                style={{
+                  WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
+                  mask: "url('/stick_2.svg') center / contain no-repeat",
+                }}
+                aria-label="Stick logo"
+              />
             </div>
-            <span className="text-lg font-semibold tracking-tight text-slate-900">
+            <span className="text-5xl font-semibold tracking-tight text-slate-900 font-sans">
               Stick
             </span>
           </div>
@@ -45,7 +154,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             </a>
             <a
               href="#how-it-works"
-              className="hidden sm:block text-sm text-slate-500 hover:text-slate-900 transition-colors px-3 py-1.5"
+              className="hidden sm:block text-sm text-slate-500 hover:text-slate-900  px-3 py-1.5"
             >
               How it works
             </a>
@@ -64,15 +173,21 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-white border border-slate-200 rounded-full px-4 py-1.5 mb-8 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-xs font-medium text-slate-600">
-              AI-powered sales intelligence
+            <span className="text-xs font-medium text-gray-800">
+              AI-powered prospection intelligence
             </span>
           </div>
 
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-slate-900 leading-[1.08]">
+          <h1
+            ref={heroRef.ref}
+            className={`text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-slate-900 leading-[1.08] transition-all duration-1000 transform ${
+              heroRef.isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            }`}
+            style={{ fontFamily: 'Luben Regular' }}
+          >
             Spend minutes,
             <br />
-            <span className="text-primary">not days</span> finding
+            <span className="italic underline decoration-wavy decoration-2">not days</span> finding
             <br />
             client prospects
           </h1>
@@ -111,38 +226,40 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 <div className="w-3 h-3 rounded-full bg-green-400" />
               </div>
               <div className="flex-1 text-center">
-                <span className="text-xs text-slate-400 font-medium">
+                <span className="text-xs text-gray-400 font-medium">
                   app.stick.ai
                 </span>
               </div>
             </div>
             <div className="bg-[#f8f9fa] p-6 sm:p-8">
               {/* Simulated dashboard */}
-              <div className="flex gap-4 mb-6">
+              <div className="flex gap-4 mb-6" ref={statsRef}>
                 <div className="bg-white rounded-lg border border-slate-200 px-4 py-3 flex-1">
-                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                     Leads enriched
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">247</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{leadsEnriched}</p>
                 </div>
                 <div className="bg-white rounded-lg border border-slate-200 px-4 py-3 flex-1">
-                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                     Products matched
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">89</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{productsMatched}</p>
                 </div>
                 <div className="bg-white rounded-lg border border-slate-200 px-4 py-3 flex-1 hidden sm:block">
-                  <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">
                     Decks generated
                   </p>
-                  <p className="text-2xl font-bold text-slate-900 mt-1">34</p>
+                  <p className="text-2xl font-bold text-slate-900 mt-1">{decksGenerated}</p>
                 </div>
               </div>
               {/* Simulated table rows */}
               <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                <div className="grid grid-cols-5 gap-4 px-4 py-2.5 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                <div className="grid grid-cols-7 gap-5 px-4 py-2.5 border-b border-slate-100 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                   <span>Company</span>
                   <span>Industry</span>
+                  <span>Employees</span>
+                  <span>Revenue</span>
                   <span>Match score</span>
                   <span className="hidden sm:block">Status</span>
                   <span className="hidden sm:block">Assets</span>
@@ -151,36 +268,56 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                   {
                     name: "Acme Corp",
                     industry: "SaaS",
+                    employees: 250,
+                    revenue: "$25M",
                     score: 9.2,
                     status: "complete",
                   },
                   {
                     name: "NovaTech",
                     industry: "FinTech",
+                    employees: 80,
+                    revenue: "$8M",
                     score: 8.7,
                     status: "complete",
                   },
                   {
                     name: "DataStream",
                     industry: "Analytics",
+                    employees: 120,
+                    revenue: "$15M",
                     score: 8.1,
                     status: "enriching",
                   },
                   {
                     name: "CloudBase",
                     industry: "DevOps",
+                    employees: 60,
+                    revenue: "$10M",
                     score: 7.5,
                     status: "pending",
                   },
                 ].map((row, i) => (
                   <div
                     key={i}
-                    className="grid grid-cols-5 gap-4 px-4 py-3 border-b border-slate-50 last:border-0 text-sm items-center"
+                    className="grid grid-cols-7 gap-5 px-4 py-3 border-b border-slate-50 last:border-0 text-sm items-center"
                   >
                     <span className="font-medium text-slate-900">
                       {row.name}
                     </span>
-                    <span className="text-slate-500">{row.industry}</span>
+
+                    <span className="text-slate-500">
+                      {row.industry}
+                    </span>
+
+                    <span className="text-slate-500">
+                      {row.employees}
+                    </span>
+
+                    <span className="text-slate-500">
+                      {row.revenue}
+                    </span>
+
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 bg-slate-100 rounded-full max-w-[80px]">
                         <div
@@ -192,6 +329,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                         {row.score}
                       </span>
                     </div>
+
                     <span className="hidden sm:block">
                       <span
                         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -205,7 +343,8 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                         {row.status}
                       </span>
                     </span>
-                    <span className="hidden sm:flex items-center gap-1.5 text-slate-400">
+
+                    <span className="hidden sm:flex items-center gap-1.5 text-gray-400">
                       <span className="material-symbols-outlined text-[16px]">
                         slideshow
                       </span>
@@ -227,20 +366,20 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* Logos / social proof */}
       <section className="py-12 border-y border-slate-200 bg-white">
         <div className="max-w-5xl mx-auto px-6 text-center">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-6">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-6">
             Built with leading AI and data infrastructure
           </p>
           <div className="flex items-center justify-center gap-10 sm:gap-16 flex-wrap opacity-40">
-            <span className="text-lg font-bold text-slate-900 tracking-tight">
+            <span className="text-lg font-bold text-gray-900 tracking-tight">
               Claude
             </span>
-            <span className="text-lg font-bold text-slate-900 tracking-tight">
+            <span className="text-lg font-bold text-gray-900 tracking-tight">
               LinkUp
             </span>
-            <span className="text-lg font-bold text-slate-900 tracking-tight">
+            <span className="text-lg font-bold text-gray-900 tracking-tight">
               Stripe
             </span>
-            <span className="text-lg font-bold text-slate-900 tracking-tight">
+            <span className="text-lg font-bold text-gray- tracking-tight">
               ElevenLabs
             </span>
           </div>
@@ -248,15 +387,32 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* Features grid */}
-      <section id="features" className="py-24 px-6">
+      <section
+        ref={featuresRef.ref}
+        id="features"
+        className={`py-24 px-6 transition-all duration-1000 transform ${
+          featuresRef.isVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-12"
+        }`}
+      >
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
+            <p className="text-xs font-semibold text-black larayck-500uppercase tracking-widest mb-3">
               Features
             </p>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
-              Everything your sales team
-              <br className="hidden sm:block" /> needs in one place
+            <h2
+              className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
+              style={{ fontFamily: "Luben Regular" }}
+            >
+              {typedText.split("\n").map((line, i) => (
+                <span key={i}>
+                  {line}
+                  {i < typedText.split("\n").length - 1 && (
+                    <br className="hidden sm:block" />
+                  )}
+                </span>
+              ))}
             </h2>
             <p className="mt-4 text-slate-500 max-w-xl mx-auto">
               From company discovery to personalized pitch decks — Stick
@@ -299,7 +455,14 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
             ].map((feature, i) => (
               <div
                 key={i}
-                className="clay-card rounded-2xl p-6 hover:shadow-md transition-shadow"
+                className={`clay-card rounded-2xl p-6 hover:shadow-md transition-all duration-700 transform ${
+                  featuresRef.isVisible
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-12"
+                }`}
+                style={{
+                  transitionDelay: featuresRef.isVisible ? `${i * 100}ms` : "0ms",
+                }}
               >
                 <div className="w-10 h-10 rounded-lg bg-slate-900 flex items-center justify-center mb-4">
                   <span className="material-symbols-outlined text-xl text-white">
@@ -319,13 +482,24 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="py-24 px-6 bg-white border-y border-slate-200">
+      <section
+        ref={howItWorksRef.ref}
+        id="how-it-works"
+        className={`py-24 px-6 bg-white border-y border-slate-200 transition-all duration-1000 transform ${
+          howItWorksRef.isVisible
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-12"
+        }`}
+      >
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-16">
-            <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-3">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">
               How it works
             </p>
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
+            <h2
+              className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
+              style={{ fontFamily: "Luben Regular" }}
+            >
               Three steps to your first pitch
             </h2>
           </div>
@@ -351,8 +525,18 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                 desc: "Stick enriches each company, matches the best product, and generates a personalized pitch deck and email.",
               },
             ].map((step, i) => (
-              <div key={i} className="text-center">
-                <div className="text-5xl font-black text-slate-100 mb-4">
+              <div
+                key={i}
+                className={`text-center transition-all duration-700 transform ${
+                  howItWorksRef.isVisible
+                    ? "opacity-100 translate-x-0"
+                    : "opacity-0 -translate-x-12"
+                }`}
+                style={{
+                  transitionDelay: howItWorksRef.isVisible ? `${i * 150}ms` : "0ms",
+                }}
+              >
+                <div className="text-5xl font-bold text-gray-400 mb-4">
                   {step.step}
                 </div>
                 <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center mx-auto mb-4">
@@ -360,7 +544,10 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
                     {step.icon}
                   </span>
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">
+                <h3
+                  className="text-lg font-semibold text-slate-900 mb-2"
+                  style={{ fontFamily: "Luben Regular" }}
+                >
                   {step.title}
                 </h3>
                 <p className="text-sm text-slate-500 leading-relaxed max-w-xs mx-auto">
@@ -377,7 +564,9 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="max-w-5xl mx-auto">
           <div className="clay-card rounded-2xl p-10 sm:p-14">
             <div className="text-center mb-12">
-              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
+              <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900"
+                style={{ fontFamily: "Luben Regular" }}
+              >  
                 Built for speed and scale
               </h2>
               <p className="mt-3 text-slate-500 max-w-lg mx-auto">
@@ -406,10 +595,13 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       {/* CTA */}
       <section className="py-24 px-6 bg-slate-900">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white">
+          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-white"
+            style={{ fontFamily: "Luben Regular" }}
+          >
             Stop searching. Start selling.
+            
           </h2>
-          <p className="mt-4 text-slate-400 text-lg max-w-xl mx-auto">
+          <p className="mt-4 text-gray-400 text-lg max-w-xl mx-auto">
             Stick is your AI sales team — it discovers, researches, matches,
             and pitches. All you have to do is close.
           </p>
@@ -429,12 +621,22 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
       <footer className="py-8 px-6 bg-slate-900 border-t border-slate-800">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-white flex items-center justify-center">
-              <span className="material-symbols-outlined text-sm text-slate-900">
-                auto_awesome
-              </span>
+            <div className="w-8 h-8 rounded bg-white flex items-center justify-center">
+              <span
+                className="w-6 h-6 bg-amber-800"
+                style={{
+                  WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
+                  mask: "url('/stick_2.svg') center / contain no-repeat",
+                }}
+                aria-label="Stick logo"
+              />
             </div>
-            <span className="text-sm font-medium text-slate-400">Stick</span>
+            <span
+              className="text-sm font-medium text-white"
+              style={{ fontFamily: "Helvetica" }}
+            >
+              Stick
+            </span>
           </div>
           <p className="text-xs text-slate-500">
             Built at HackEurope 2025. Powered by Claude, LinkUp, Stripe &amp; ElevenLabs.
