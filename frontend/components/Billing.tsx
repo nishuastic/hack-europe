@@ -35,9 +35,11 @@ interface BillingData {
 
 const USAGE_COSTS = [
   { name: "Enrich Lead", key: "enrichment", credits: 5, description: "Deep web research per company" },
+  { name: "ICP Discovery", key: "icp_research", credits: 3, description: "AI discovers target companies" },
   { name: "Matching", key: "matching", credits: 2, description: "AI product-to-lead matching" },
-  { name: "Pitch Deck Generation", key: "pitch_deck", credits: 10, description: "7-slide personalized deck" },
-  { name: "Email Generation", key: "email", credits: 1, description: "Personalized outreach email" },
+  { name: "Pitch Deck", key: "pitch_deck", credits: 10, description: "7-slide personalized deck" },
+  { name: "Email", key: "email", credits: 1, description: "Personalized outreach email" },
+  { name: "LinkedIn Outreach", key: "linkedin_outreach", credits: 0, description: "Warm intro plans — free" },
 ];
 
 function BillingContent() {
@@ -166,7 +168,7 @@ function BillingContent() {
       {/* Usage Costs */}
       <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 mb-8">
         <h2 className="text-lg font-semibold text-slate-900 mb-4">Usage Costs</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {USAGE_COSTS.map((usage) => (
             <div key={usage.key} className="bg-white rounded-lg p-4 border border-slate-200">
               <p className="text-sm font-medium text-slate-900">{usage.name}</p>

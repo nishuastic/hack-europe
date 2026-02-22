@@ -14,6 +14,7 @@ import Onboard from "@/components/Onboard";
 import Products from "@/components/Products";
 import ProductEdit from "@/components/ProductEdit";
 import LinkedInImport from "@/components/LinkedInImport";
+import Billing from "@/components/Billing";
 
 export default function AppPage() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -107,14 +108,19 @@ export default function AppPage() {
             <LeadDetail
               leadId={view.leadId}
               onBack={() => goTo({ page: "dashboard" })}
-              onOpenPitchEditor={() =>
-                goTo({ page: "pitch-editor", leadId: view.leadId })
+              onOpenPitchEditor={(productId) =>
+                goTo({ page: "pitch-editor", leadId: view.leadId, productId })
               }
             />
           )}
           {view.page === "linkedin-import" && (
             <div className="p-4 sm:p-6 md:p-10">
               <LinkedInImport />
+            </div>
+          )}
+          {view.page === "billing" && (
+            <div className="p-4 sm:p-6 md:p-10">
+              <Billing />
             </div>
           )}
         </div>

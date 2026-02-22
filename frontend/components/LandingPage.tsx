@@ -581,7 +581,7 @@ export default function LandingPage({ onGetStarted }: LandingPageProps) {
           <h2 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-white"
           >
             Stop searching. Start selling.
-            
+
           </h2>
           <p className="mt-4 text-gray-400 text-lg max-w-xl mx-auto">
             Stick is your AI sales team — it discovers, researches, matches,
