@@ -17,20 +17,80 @@ import ProductEdit from "@/components/ProductEdit";
 import LinkedInImport from "@/components/LinkedInImport";
 import Billing from "@/components/Billing";
 import Analytics from "@/components/Analytics";
+function serializeView(view: AppView): string {
+  switch (view.page) {
+    case "lead-detail":
+      return view.runId ? `#lead-detail/${view.leadId}/${view.runId}` : `#lead-detail/${view.leadId}`;
+    case "pitch-editor":
+      return view.productId ? `#pitch-editor/${view.leadId}/${view.productId}` : `#pitch-editor/${view.leadId}`;
+    case "product-edit":
+      return view.productId ? `#product-edit/${view.productId}` : `#product-edit`;
+    case "generation-run-detail":
+      return `#generation-run-detail/${view.runId}`;
+    default:
+      return `#${view.page}`;
+  }
+}
+
+function parseHash(hash: string): AppView | null {
+  const raw = hash.replace(/^#/, "");
+  if (!raw) return null;
+  const parts = raw.split("/");
+  const page = parts[0];
+  switch (page) {
+    case "dashboard":
+    case "products":
+    case "billing":
+    case "analytics":
+    case "linkedin-import":
+    case "onboard":
+      return { page };
+    case "product-edit":
+      return { page: "product-edit", productId: parts[1] ? Number(parts[1]) : undefined };
+    case "generation-run-detail":
+      return parts[1] ? { page: "generation-run-detail", runId: Number(parts[1]) } : null;
+    case "lead-detail":
+      return parts[1] ? { page: "lead-detail", leadId: Number(parts[1]), runId: parts[2] ? Number(parts[2]) : undefined } : null;
+    case "pitch-editor":
+      return parts[1] ? { page: "pitch-editor", leadId: Number(parts[1]), productId: parts[2] ? Number(parts[2]) : undefined } : null;
+    default:
+      return null;
+  }
+}
+
 export default function AppPage() {
   const { isAuthenticated, isLoading } = useAuth();
   const searchParams = useSearchParams();
-  const [view, setView] = useState<AppView>({ page: "dashboard" });
+  const [view, setView] = useState<AppView>(() => {
+    if (typeof window !== "undefined") {
+      return parseHash(window.location.hash) ?? { page: "dashboard" };
+    }
+    return { page: "dashboard" };
+  });
   const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const goTo = useCallback((v: AppView) => setView(v), []);
+  const goTo = useCallback((v: AppView) => {
+    setView(v);
+    window.location.hash = serializeView(v);
+  }, []);
+
+  // Listen for browser back/forward
+  useEffect(() => {
+    const onHashChange = () => {
+      const parsed = parseHash(window.location.hash);
+      if (parsed) setView(parsed);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   useEffect(() => {
     const leadId = searchParams.get("leadId");
     if (leadId) {
-      setView({ page: "lead-detail", leadId: Number(leadId) });
+      goTo({ page: "lead-detail", leadId: Number(leadId) });
     }
-  }, [searchParams]);
+  }, [searchParams, goTo]);
 
   // Show loading state while checking auth
   if (isLoading) {
@@ -69,7 +129,7 @@ export default function AppPage() {
 
   return (
     <div className="flex h-screen overflow-hidden w-full">
-      <Sidebar view={view} setView={goTo} onProfileClick={() => goTo({ page: "onboard" })} />
+      <Sidebar view={view} setView={goTo} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(c => !c)} onProfileClick={() => goTo({ page: "onboard" })} />
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <Header />
         <div className="flex-1 overflow-y-auto bg-[#f8f9fa]">

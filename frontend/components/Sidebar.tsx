@@ -27,7 +27,7 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
   return (
     <aside className={`hidden md:flex flex-col bg-white border-r border-slate-200/60 z-20 shrink-0 h-screen transition-all duration-300 ease-in-out ${collapsed ? 'w-[60px]' : 'w-52'}`}>
       {/* Logo & Toggle */}
-      <div className={`py-5 flex items-center shrink-0 overflow-visible ${collapsed ? 'flex-col gap-1 px-0' : 'px-3 gap-1'}`}>
+      <div className={`py-5 flex items-center shrink-0 overflow-visible ${collapsed ? 'flex-col gap-1 px-0' : 'px-3 gap-0'}`}>
         {collapsed ? (
           /* Collapsed: show chevron button to expand */
           <button
@@ -42,9 +42,9 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
         ) : (
           /* Expanded: logo + title + collapse chevron */
           <>
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
+            <div className="w-14 h-14 rounded-lg flex items-center justify-center shrink-0">
               <span
-                className="w-7 h-7 bg-black"
+                className="w-14 h-14 bg-black"
                 style={{
                   WebkitMask: "url('/stick_2.svg') center / contain no-repeat",
                   mask: "url('/stick_2.svg') center / contain no-repeat",
@@ -52,13 +52,13 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
                 aria-label="Stick logo"
               />
             </div>
-            <h2 className="text-lg font-bold leading-tight tracking-tight text-slate-900 flex-1 min-w-0" style={{ fontFamily: "'Playfair Display', serif" }}>
+            <h2 className="text-4xl font-bold leading-tight tracking-tight text-slate-900 flex-1 min-w-0" style={{ fontFamily: "'Playfair Display', serif" }}>
               Stick
             </h2>
             {onToggle && (
               <button
                 onClick={onToggle}
-                className="p-1.5 rounded-md hover:bg-slate-100 transition-colors shrink-0"
+                className="p-1.5 rounded-md hover:bg-slate-100 transition-colors shrink-0 mt-2.5"
                 title="Collapse sidebar"
               >
                 <span className="material-symbols-outlined text-[20px] text-slate-500">
