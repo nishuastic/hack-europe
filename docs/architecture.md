@@ -9,7 +9,7 @@ Backend:  Python 3.12 + FastAPI (managed by uv)
 Frontend: Next.js + TypeScript + AG Grid (managed by bun)
 DB:       SQLite via SQLModel
 Realtime: WebSocket (enrichment + matching streams live to cells)
-AI:       Claude (reasoning/generation) + ElevenLabs (voice briefings)
+AI:       Claude (reasoning/generation)
 Search:   LinkUp SDK (web research)
 Billing:  Stripe (usage-based)
 ```
@@ -158,7 +158,6 @@ WS     /ws/updates                  # Real-time updates
 
 ### Not yet implemented
 ```
-POST   /api/leads/{id}/voice        # ElevenLabs voice briefing (Phase 3)
 POST   /api/billing/checkout        # Stripe checkout (Phase 3)
 GET    /api/billing/credits          # Remaining credits (Phase 3)
 ```
@@ -179,10 +178,19 @@ GET    /api/billing/credits          # Remaining credits (Phase 3)
 {"type": "enrichment_complete", "lead_id": 1, "company_name": "Stripe", "rounds": 2}
 {"type": "enrichment_error", "lead_id": 1, "error": "..."}
 
+<<<<<<< HEAD
+Match update:
+```json
+{"type": "match_update", "lead_id": 1, "product_id": 2,
+ "match_score": 8.5, "match_reasoning": "Strong alignment because...",
+ "product_name": "Stick Pro"}
+```
+=======
 // Matching
 {"type": "matching_start", "total_leads": 5, "total_products": 3}
 {"type": "match_update", "lead_id": 1, "product_id": 2, "match_score": 8.5, "match_reasoning": "..."}
 {"type": "matching_complete"}
+>>>>>>> 8d9f7ae204225a5c5fe19a72a608e654cc029ff5
 
 // Predictions
 {"type": "prediction_update", "lead_id": 1, "product_id": 2, "conversion_likelihood": "high"}
@@ -196,4 +204,3 @@ GET    /api/billing/credits          # Remaining credits (Phase 3)
 | Best Use of Claude ($10k credits) | Core reasoning: query planning, extraction, ICP discovery, matching, deck gen |
 | Best Stripe Integration (€3k) | Usage-based billing, pay-per-enrichment/deck |
 | Autonomous Consulting Agent | Discovery agent acts like a senior SDR/consultant |
-| Best Use of ElevenLabs (AirPods) | Voice call-prep briefing per lead |

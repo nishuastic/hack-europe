@@ -42,10 +42,10 @@ async def seeded_data(client: AsyncClient):
     return lead_id
 
 
-async def test_generate_matches_endpoint(client: AsyncClient, seeded_data: int):
+async def test_generate_matches_endpoint(authed_client: AsyncClient, seeded_data: int):
     """Test POST /api/matches/generate returns 200."""
     with patch("backend.matching.pipeline.generate_all_matches", new_callable=AsyncMock):
-        resp = await client.post("/api/matches/generate")
+        resp = await authed_client.post("/api/matches/generate")
         assert resp.status_code == 200
         assert resp.json()["status"] == "matching_started"
 

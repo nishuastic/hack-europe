@@ -42,7 +42,6 @@ Results saved to `prompts/results/`.
 - [x] `test_discovery.py` — CLI test harness for discovery
 
 ## Remaining Work
-- [ ] Voice briefing prompt (for ElevenLabs, Phase 3)
 - [ ] Conversion prediction prompt (currently inline in `analytics.py`)
 - [ ] Quality pass: run all prompts against 5 demo companies × 3 products, fix issues
 - [ ] Ensure pitch decks are flawless for demo companies

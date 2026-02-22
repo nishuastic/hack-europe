@@ -1,11 +1,16 @@
-"""Discovery prompt — Person B can override the ICP discovery system prompt here.
+"""Discovery prompt — Phase 1 query generation for ICP discovery.
 
 The backend imports this module and calls ``build_prompt(products)`` to get the
-system prompt used by the ICP discovery agent (Claude Sonnet with tool_use).
+system prompt used by Claude to generate targeted web search queries for each
+product's Ideal Customer Profile.
 
 To customize: edit ``build_prompt()`` below. The backend's fallback prompt in
 ``backend/discovery/prompts.py`` is used if this import fails, so this file is
 optional but recommended for prompt iteration.
+
+The prompt instructs Claude to return a JSON object::
+
+    {"queries": [{"query": "...", "depth": "standard", "icp_rationale": "..."}]}
 
 Test with::
 
@@ -22,23 +27,15 @@ if TYPE_CHECKING:
 
 
 def build_prompt(products: list[Product]) -> str:
-    """Build the ICP discovery system prompt.
+    """Build the Phase 1 query-generation prompt.
 
-    Called by ``backend.discovery.prompts.build_discovery_prompt()`` when this
+    Called by ``backend.discovery.icp_agent._get_query_gen_prompt()`` when this
     module is importable. Return the full system prompt string.
 
-    The prompt should instruct Claude to:
+    The prompt instructs Claude to:
     1. Analyze the product catalog and derive ICPs
-    2. Use search_companies tool to find matching companies
-    3. Use fetch_company_website / get_company_details to validate
-    4. Iterate with different ICP angles if needed
-    5. Call submit_discovered_companies with final list
-
-    Available tools (defined in backend/discovery/icp_agent.py):
-    - search_companies(query, depth) -> {companies: [{name, url, description, industry}]}
-    - fetch_company_website(url) -> {content, sources}
-    - get_company_details(company_name, company_url?) -> {company_name, website, description, industry, employees, funding, revenue}
-    - submit_discovered_companies(companies) -> terminal, ends loop
+    2. Generate 2-4 targeted web search queries per product/ICP
+    3. Return a JSON object with queries, depth, and ICP rationale
     """
     # Default: delegate to backend's built-in prompt
     from backend.discovery.prompts import build_discovery_prompt

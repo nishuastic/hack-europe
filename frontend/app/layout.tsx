@@ -1,8 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { AuthProvider } from "@/components/AuthContext";
 
 export const metadata: Metadata = {
-  title: "SalesForge - AI Sales Agent",
+  title: "Stick - AI Sales Agent",
   description: "AI-powered sales intelligence platform",
 };
 
@@ -29,8 +30,8 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="bg-[#f8f9fa] font-display text-slate-900 min-h-screen flex overflow-hidden antialiased">
-        {children}
+      <body className="bg-[#f8f9fa] font-display text-slate-900 min-h-screen antialiased">
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

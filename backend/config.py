@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     linkup_api_key: str = ""
     database_url: str = "sqlite+aiosqlite:///./salesforge.db"
     stripe_api_key: str = ""
+    stripe_webhook_secret: str = ""
+    paid_api_key: str = ""
     elevenlabs_api_key: str = ""
+    paid_product_external_id: str = "stick_ai_sdr"
     jwt_secret_key: str = "change-me-in-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60

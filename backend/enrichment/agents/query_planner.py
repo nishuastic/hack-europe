@@ -27,7 +27,7 @@ class SearchQuery:
 
     def __init__(self, query: str, depth: str, target_field: str, rationale: str):
         self.query = query
-        self.depth = depth  # "standard" or "deep"
+        self.depth = "standard"  # always standard
         self.target_field = target_field
         self.rationale = rationale
 
@@ -64,7 +64,7 @@ Return ONLY valid JSON matching this schema:
   "queries": [
     {
       "query": "the search query string",
-      "depth": "standard" or "deep",
+      "depth": "standard",
       "target_field": "which Lead field this targets (description|funding|industry|revenue|...)",
       "rationale": "why this query is useful"
     }
@@ -74,8 +74,7 @@ Return ONLY valid JSON matching this schema:
 Guidelines:
 - Generate 5-8 queries for a fresh research round (no prior context)
 - Generate 2-4 targeted queries for a follow-up round (when gaps and hints are provided)
-- Use "standard" depth for simple factual lookups (company overview, industry)
-- Use "deep" depth for harder-to-find data (contacts, customers, revenue, buying signals)
+- Always use "standard" depth
 - Each query should target a specific field — tag it clearly
 - Make queries specific to the company, not generic templates
 - For contacts, include "CEO", "CTO", "leadership" in the query

@@ -75,6 +75,7 @@ Return ONLY valid JSON with this exact structure:
     "revenue": "Revenue estimate if available, or null",
     "employees": integer or null,
     "contacts": [{"name": "...", "role": "...", "linkedin": "...or null"}],
+    "company_fit": "Brief assessment of fit as potential client, or null",
     "customers": ["Company A", "Company B"],
     "buying_signals": [
       {"signal_type": "recent_funding", "description": "Raised $45M Series B", "strength": "strong"}
@@ -141,11 +142,13 @@ async def extract_lead_data(
     company_name: str,
     search_results: list[SearchResult],
     existing_data: dict | None = None,
+    icp_context: str | None = None,
 ) -> ExtractionResult:
     """Extract structured Lead fields from search results using Claude.
 
     For initial extraction: pass company_name + search_results.
     For follow-up: also pass existing_data to merge with.
+    If icp_context is provided, also scores the company against the ICP.
     """
     # Try Person B's prompts first, fall back to inline
     imported = _try_import_prompt()
@@ -159,6 +162,17 @@ async def extract_lead_data(
     if existing_data:
         system_prompt = system_prompt + "\n\n" + merge_addendum.format(
             existing_data=json.dumps(existing_data, indent=2)[:3000]
+        )
+
+    # If ICP context available, ask Claude to also score against ICP
+    if icp_context:
+        system_prompt += (
+            "\n\nADDITIONAL TASK: This company is being evaluated against an Ideal Customer Profile.\n"
+            "Based on the ICP below and the company data you extracted, also provide:\n"
+            '- "icp_fit_score": 0-100 (100 = perfect ICP match)\n'
+            '- "icp_fit_reasoning": "Why this company does/doesn\'t match the ICP"\n\n'
+            "Include these two fields inside the \"data\" object alongside the regular fields.\n\n"
+            f"ICP Profile:\n{icp_context}"
         )
 
     # Build research text from search results

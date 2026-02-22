@@ -1,58 +1,103 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { api, Product } from '@/lib/api';
+import { useState, useEffect } from "react";
+import { api, Product, ICPProfile } from "@/lib/api";
 
 interface ProductsProps {
   onEdit: (productId?: number) => void;
 }
 
-const DEMO_PRODUCTS: Product[] = [
-  { id: 1, name: 'ChurnPredict', description: 'AI-powered analytics dashboard that predicts which customers are likely to cancel.', features: ['Real-time usage tracking', 'Automated email triggers'], differentiator: '94% accuracy in predicting churn' },
-  { id: 2, name: 'RetainFlow', description: 'Enterprise retention workflow automation platform.', features: ['Custom workflows', 'CRM integration'], differentiator: 'End-to-end retention pipeline' },
-];
-
 export default function Products({ onEdit }: ProductsProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [icpProfiles, setIcpProfiles] = useState<Record<number, ICPProfile>>({});
+  const [icpLoading, setIcpLoading] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
-    api.getProducts()
-      .then(setProducts)
-      .catch(() => setProducts(DEMO_PRODUCTS))
+    api
+      .getProducts()
+      .then((prods) => {
+        setProducts(prods);
+        // Load ICP profiles for products with current_clients
+        prods.forEach((p) => {
+          if (p.current_clients && p.current_clients.length > 0) {
+            api.getICPProfile(p.id).then((res) => {
+              if ("status" in res && res.status === "no_icp") return;
+              setIcpProfiles((prev) => ({ ...prev, [p.id]: res as ICPProfile }));
+            }).catch(() => {});
+          }
+        });
+      })
+      .catch((err) => console.error("Failed to load products:", err))
       .finally(() => setLoading(false));
   }, []);
 
+  const handleLearnICP = async (e: React.MouseEvent, productId: number) => {
+    e.stopPropagation();
+    setIcpLoading((prev) => ({ ...prev, [productId]: true }));
+    try {
+      await api.learnICP(productId);
+      // Poll for completion
+      const poll = setInterval(async () => {
+        const res = await api.getICPProfile(productId);
+        if ("status" in res && res.status !== "no_icp") {
+          const profile = res as ICPProfile;
+          if (profile.status === "complete" || profile.status === "failed") {
+            clearInterval(poll);
+            setIcpLoading((prev) => ({ ...prev, [productId]: false }));
+            if (profile.status === "complete") {
+              setIcpProfiles((prev) => ({ ...prev, [productId]: profile }));
+            }
+          }
+        }
+      }, 3000);
+    } catch (err) {
+      console.error("Failed to start ICP learning:", err);
+      setIcpLoading((prev) => ({ ...prev, [productId]: false }));
+    }
+  };
+
   return (
-    <div className="max-w-5xl mx-auto flex flex-col gap-8 pb-10">
+    <div className="w-full flex flex-col gap-8 pb-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">Products &amp; Services</h1>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">
+            Products &amp; Services
+          </h1>
           <p className="text-slate-500 text-sm md:text-base max-w-2xl leading-relaxed">
-            Manage your product catalog. The AI uses these to match and generate tailored pitch decks.
+            Manage your product catalog. The AI uses these to match and generate
+            tailored pitch decks.
           </p>
         </div>
         <button
           onClick={() => onEdit(undefined)}
           className="px-5 py-2.5 rounded-lg bg-slate-900 text-white font-medium text-sm hover:opacity-90 transition-all shadow-md flex items-center gap-2 shrink-0"
         >
-          <span className="material-symbols-outlined text-[18px]">add</span> Add Product
+          <span className="material-symbols-outlined text-[18px]">add</span> Add
+          Product
         </button>
       </div>
 
       {/* Product Cards */}
       {loading ? (
-        <div className="text-center py-12 text-slate-400">Loading products...</div>
+        <div className="text-center py-12 text-slate-400">
+          Loading products...
+        </div>
       ) : products.length === 0 ? (
         <div className="text-center py-12">
-          <span className="material-symbols-outlined text-5xl text-slate-300">inventory_2</span>
-          <p className="mt-3 text-slate-500">No products yet. Add your first product to get started.</p>
+          <span className="material-symbols-outlined text-5xl text-slate-300">
+            inventory_2
+          </span>
+          <p className="mt-3 text-slate-500">
+            No products yet. Add your first product to get started.
+          </p>
           <button
             onClick={() => onEdit(undefined)}
             className="mt-4 px-5 py-2.5 rounded-lg bg-slate-900 text-white font-medium text-sm hover:opacity-90 transition-all shadow-md inline-flex items-center gap-2"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span> Add Product
+            <span className="material-symbols-outlined text-[18px]">add</span>{" "}
+            Add Product
           </button>
         </div>
       ) : (
@@ -66,37 +111,117 @@ export default function Products({ onEdit }: ProductsProps) {
               <div className="px-6 py-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="cursor-grab text-slate-300 hover:text-slate-500 transition-colors">
-                    <span className="material-symbols-outlined text-[20px]">drag_indicator</span>
+                    <span className="material-symbols-outlined text-[20px]">
+                      drag_indicator
+                    </span>
                   </div>
-                  <h3 className="font-bold text-slate-800 text-base">{idx + 1}. {product.name}</h3>
+                  <h3 className="font-bold text-slate-800 text-base">
+                    {idx + 1}. {product.name}
+                  </h3>
                   {idx === 0 && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">Primary</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">
+                      Primary
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {product.current_clients && product.current_clients.length > 0 && (
+                    <button
+                      onClick={(e) => handleLearnICP(e, product.id)}
+                      disabled={!!icpLoading[product.id]}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                        icpProfiles[product.id]
+                          ? "bg-green-50 text-green-700 border border-green-200"
+                          : icpLoading[product.id]
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                            : "bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100"
+                      }`}
+                      title={
+                        icpProfiles[product.id]
+                          ? icpProfiles[product.id].icp_summary || "ICP learned"
+                          : "Learn ICP from current clients"
+                      }
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        {icpProfiles[product.id] ? "check_circle" : icpLoading[product.id] ? "hourglass_top" : "psychology"}
+                      </span>
+                      {icpProfiles[product.id]
+                        ? "ICP Learned"
+                        : icpLoading[product.id]
+                          ? "Learning..."
+                          : "Learn ICP"}
+                    </button>
+                  )}
                   <button
-                    onClick={(e) => { e.stopPropagation(); onEdit(product.id); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onEdit(product.id);
+                    }}
                     className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
                   >
-                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                    <span className="material-symbols-outlined text-[18px]">
+                      edit
+                    </span>
                   </button>
                   <button
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (!confirm(`Delete "${product.name}"?`)) return;
+                      try {
+                        await api.deleteProduct(product.id);
+                        setProducts((prev) =>
+                          prev.filter((p) => p.id !== product.id),
+                        );
+                      } catch (err) {
+                        console.error("Failed to delete product:", err);
+                      }
+                    }}
                     className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-all"
                   >
-                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                    <span className="material-symbols-outlined text-[18px]">
+                      delete
+                    </span>
                   </button>
                 </div>
               </div>
               <div className="px-6 pb-5">
-                <p className="text-sm text-slate-600 leading-relaxed mb-3">{product.description}</p>
+                <p className="text-sm text-slate-600 leading-relaxed mb-3">
+                  {product.description}
+                </p>
                 {product.features && product.features.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {product.features.map((f, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+                      <span
+                        key={i}
+                        className="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600"
+                      >
                         {f}
                       </span>
                     ))}
+                  </div>
+                )}
+                {/* ICP Summary Card */}
+                {icpProfiles[product.id] && icpProfiles[product.id].icp_summary && (
+                  <div className="mt-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="material-symbols-outlined text-[14px] text-blue-600">psychology</span>
+                      <span className="text-xs font-semibold text-blue-700">Ideal Customer Profile</span>
+                      <span className="text-[10px] text-blue-500 ml-1">
+                        ({icpProfiles[product.id].customers_researched} clients analyzed)
+                      </span>
+                    </div>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      {icpProfiles[product.id].icp_summary}
+                    </p>
+                    {icpProfiles[product.id].target_industries && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {icpProfiles[product.id].target_industries!.map((ind, i) => (
+                          <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">
+                            {ind}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
