@@ -256,6 +256,93 @@ class DiscoveryRequest(BaseModel):
     max_companies: int = 20
 
 
+class AutofillURLRequest(BaseModel):
+    url: str
+
+
+# ─── Autofill (LinkUp structured extraction) ────────────────────────
+
+
+PRODUCT_AUTOFILL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Product or service name"},
+        "description": {"type": "string", "description": "One-paragraph product description"},
+        "features": {"type": "array", "items": {"type": "string"}, "description": "Key features list"},
+        "industry_focus": {"type": "string", "description": "Target industry"},
+        "pricing_model": {
+            "type": "string",
+            "description": "Pricing model (SaaS, project-based, retainer, usage-based, license)",
+        },
+        "company_size_target": {"type": "string", "description": "Target company size (SMB, mid-market, enterprise)"},
+        "geography": {"type": "string", "description": "Target geography"},
+        "stage": {"type": "string", "description": "Target customer stage (startup, scaling, enterprise)"},
+        "company_name": {"type": "string", "description": "Company that makes this product"},
+        "website": {"type": "string", "description": "Product or company website URL"},
+        "example_clients": {"type": "array", "items": {"type": "string"}, "description": "Known clients or customers"},
+        "differentiator": {"type": "string", "description": "Main competitive differentiator"},
+    },
+    "required": [],
+}
+
+COMPANY_AUTOFILL_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "company_name": {"type": "string", "description": "Company name"},
+        "website": {"type": "string", "description": "Company website URL"},
+        "growth_stage": {"type": "string", "description": "Growth stage (Pre-Seed, Seed, Series A, Series B+, Public)"},
+        "geography": {"type": "string", "description": "Company HQ location"},
+        "value_proposition": {"type": "string", "description": "What the company does in one paragraph"},
+    },
+    "required": [],
+}
+
+
+def _clean_autofill(data: dict) -> dict:
+    """Replace empty strings with None so frontend can skip them."""
+    return {k: (v if v != "" else None) for k, v in data.items()}
+
+
+@app.post("/api/autofill/product")
+async def autofill_product(
+    body: AutofillURLRequest,
+    user: User = Depends(get_current_user),
+):
+    """Extract product details from a URL using LinkUp structured search."""
+    from backend.enrichment.linkup_search import _get_client
+
+    client = _get_client()
+    response = await client.async_search(
+        query=f"Extract product/service details from this page: {body.url}",
+        depth="standard",
+        output_type="structured",
+        structured_output_schema=json.dumps(PRODUCT_AUTOFILL_SCHEMA),
+    )
+    raw = response.output if hasattr(response, "output") else response
+    data = json.loads(raw) if isinstance(raw, str) else raw
+    return _clean_autofill(data)
+
+
+@app.post("/api/autofill/company-profile")
+async def autofill_company_profile(
+    body: AutofillURLRequest,
+    user: User = Depends(get_current_user),
+):
+    """Extract company profile details from a URL using LinkUp structured search."""
+    from backend.enrichment.linkup_search import _get_client
+
+    client = _get_client()
+    response = await client.async_search(
+        query=f"Extract company information from this page: {body.url}",
+        depth="standard",
+        output_type="structured",
+        structured_output_schema=json.dumps(COMPANY_AUTOFILL_SCHEMA),
+    )
+    raw = response.output if hasattr(response, "output") else response
+    data = json.loads(raw) if isinstance(raw, str) else raw
+    return _clean_autofill(data)
+
+
 # ─── Product CRUD ─────────────────────────────────────────────────────
 
 

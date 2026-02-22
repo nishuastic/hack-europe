@@ -647,6 +647,32 @@ class ApiClient {
     });
   }
 
+  async autofillProduct(url: string): Promise<Partial<Product>> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/autofill/product`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) throw new Error("Auto-fill failed");
+    return res.json();
+  }
+
+  async autofillCompanyProfile(url: string): Promise<{
+    company_name?: string;
+    website?: string;
+    growth_stage?: string;
+    geography?: string;
+    value_proposition?: string;
+  }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/autofill/company-profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!res.ok) throw new Error("Auto-fill failed");
+    return res.json();
+  }
+
   async getICPProfile(productId: number): Promise<ICPProfile | { status: string }> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/products/${productId}/icp`);
     return res.json();

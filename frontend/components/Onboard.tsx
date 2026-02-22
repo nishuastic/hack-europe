@@ -9,6 +9,8 @@ export default function Onboard() {
   const [stage, setStage] = useState("Series A");
   const [geography, setGeography] = useState("");
   const [valueProp, setValueProp] = useState("");
+  const [autofillUrl, setAutofillUrl] = useState("");
+  const [autofilling, setAutofilling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -28,6 +30,23 @@ export default function Onboard() {
         // Backend not available, keep defaults
       });
   }, []);
+
+  const handleAutofill = async () => {
+    if (!autofillUrl.trim()) return;
+    setAutofilling(true);
+    try {
+      const data = await api.autofillCompanyProfile(autofillUrl.trim());
+      if (data.company_name) setCompanyName(data.company_name);
+      if (data.website) setWebsite(data.website);
+      if (data.growth_stage) setStage(data.growth_stage);
+      if (data.geography) setGeography(data.geography);
+      if (data.value_proposition) setValueProp(data.value_proposition);
+    } catch (err) {
+      console.error("Auto-fill failed:", err);
+    } finally {
+      setAutofilling(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!companyName.trim()) return;
@@ -91,6 +110,28 @@ export default function Onboard() {
           <h2 className="text-lg font-bold text-slate-800">My Company Profile</h2>
         </div>
         <div className="clay-card rounded-2xl p-6 md:p-8">
+          {/* Auto-fill from URL */}
+          <div className="flex items-center gap-3 mb-6 pb-6 border-b border-slate-100">
+            <span className="material-symbols-outlined text-slate-400 text-[20px]">auto_awesome</span>
+            <input
+              value={autofillUrl}
+              onChange={(e) => setAutofillUrl(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAutofill()}
+              className="flex-1 rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400"
+              placeholder="Paste your company website URL to auto-fill..."
+            />
+            <button
+              onClick={handleAutofill}
+              disabled={autofilling || !autofillUrl.trim()}
+              className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:opacity-90 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                {autofilling ? "progress_activity" : "bolt"}
+              </span>
+              {autofilling ? "Extracting..." : "Auto-fill"}
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">

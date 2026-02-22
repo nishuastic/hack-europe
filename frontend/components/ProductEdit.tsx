@@ -25,6 +25,9 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
   const [currentClients, setCurrentClients] = useState<{name: string; website: string}[]>([{name: "", website: ""}]);
   const [loadingProduct, setLoadingProduct] = useState(!isNew);
   
+  const [autofillUrl, setAutofillUrl] = useState("");
+  const [autofilling, setAutofilling] = useState(false);
+
   const [icpProfile, setIcpProfile] = useState<ICPProfile | null>(null);
   const [icpLoading, setIcpLoading] = useState(false);
   const [icpLearning, setIcpLearning] = useState(false);
@@ -68,6 +71,30 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
       console.error("Failed to learn ICP:", err);
     } finally {
       setIcpLearning(false);
+    }
+  };
+
+  const handleAutofill = async () => {
+    if (!autofillUrl.trim()) return;
+    setAutofilling(true);
+    try {
+      const data = await api.autofillProduct(autofillUrl.trim());
+      if (data.name) setName(data.name);
+      if (data.description) setDescription(data.description);
+      if (data.features?.length) setFeatures([...data.features, ""]);
+      if (data.differentiator) setDifferentiator(data.differentiator);
+      if (data.industry_focus) setIndustryFocus(data.industry_focus);
+      if (data.pricing_model) setPricingModel(data.pricing_model);
+      if (data.company_size_target) setCompanySizeTarget(data.company_size_target);
+      if (data.geography) setGeography(data.geography);
+      if (data.stage) setStage(data.stage);
+      if (data.company_name) setCompanyName(data.company_name);
+      if (data.website) setWebsite(data.website);
+      if (data.example_clients?.length) setExampleClients([...data.example_clients, ""]);
+    } catch (err) {
+      console.error("Auto-fill failed:", err);
+    } finally {
+      setAutofilling(false);
     }
   };
 
@@ -205,6 +232,28 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
             {saving ? "Saving..." : isNew ? "Create Product" : "Save Changes"}
           </button>
         </div>
+      </div>
+
+      {/* Auto-fill from URL */}
+      <div className="clay-card rounded-2xl p-4 flex items-center gap-3">
+        <span className="material-symbols-outlined text-slate-400 text-[20px]">auto_awesome</span>
+        <input
+          value={autofillUrl}
+          onChange={(e) => setAutofillUrl(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleAutofill()}
+          className="flex-1 rounded-lg border border-slate-200 bg-white text-slate-900 px-4 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400"
+          placeholder="Paste a product page URL to auto-fill fields..."
+        />
+        <button
+          onClick={handleAutofill}
+          disabled={autofilling || !autofillUrl.trim()}
+          className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:opacity-90 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+        >
+          <span className="material-symbols-outlined text-[16px]">
+            {autofilling ? "progress_activity" : "bolt"}
+          </span>
+          {autofilling ? "Extracting..." : "Auto-fill"}
+        </button>
       </div>
 
       {/* Form */}
