@@ -22,6 +22,7 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [exampleClients, setExampleClients] = useState([""]);
+  const [currentClients, setCurrentClients] = useState<{name: string; website: string}[]>([{name: "", website: ""}]);
   const [loadingProduct, setLoadingProduct] = useState(!isNew);
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
         setCompanyName(product.company_name || "");
         setWebsite(product.website || "");
         setExampleClients(product.example_clients?.length ? [...product.example_clients, ""] : [""]);
+        setCurrentClients(product.current_clients?.length ? [...product.current_clients, {name: "", website: ""}] : [{name: "", website: ""}]);
       }
     }).finally(() => setLoadingProduct(false));
   }, [productId]);
@@ -81,12 +83,28 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
     }
   };
 
+  const updateCurrentClient = (idx: number, field: "name" | "website", val: string) => {
+    const next = [...currentClients];
+    next[idx] = { ...next[idx], [field]: val };
+    setCurrentClients(next);
+    if (idx === currentClients.length - 1 && val.trim() !== "" && currentClients.length < 10) {
+      setCurrentClients([...next, {name: "", website: ""}]);
+    }
+  };
+
+  const removeCurrentClient = (idx: number) => {
+    if (currentClients.length > 1) {
+      setCurrentClients(currentClients.filter((_, i) => i !== idx));
+    }
+  };
+
   const handleSave = async () => {
     if (!name.trim()) return;
     setSaving(true);
     try {
       const cleanFeatures = features.filter((f) => f.trim());
       const cleanClients = exampleClients.filter((c) => c.trim());
+      const cleanCurrentClients = currentClients.filter((c) => c.name.trim() || c.website.trim());
       const productData = {
         name,
         description,
@@ -100,6 +118,7 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
         company_name: companyName || undefined,
         website: website || undefined,
         example_clients: cleanClients.length ? cleanClients : undefined,
+        current_clients: cleanCurrentClients.length ? cleanCurrentClients : undefined,
       };
       if (isNew) {
         await api.createProduct(productData);
@@ -371,6 +390,42 @@ export default function ProductEdit({ productId, onBack }: ProductEditProps) {
                     <button
                       type="button"
                       onClick={() => removeExampleClient(idx)}
+                      className="px-2 py-1 text-red-600 hover:text-red-800"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Current Clients */}
+          <div className="border-t border-slate-100 pt-6">
+            <label className="block text-sm font-semibold text-slate-700 mb-3">
+              Current Clients (with website)
+            </label>
+            <div className="space-y-2">
+              {currentClients.map((client, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={client.name}
+                    onChange={(e) => updateCurrentClient(idx, "name", e.target.value)}
+                    placeholder={`Client ${idx + 1} name`}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={client.website}
+                    onChange={(e) => updateCurrentClient(idx, "website", e.target.value)}
+                    placeholder="Website URL"
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  />
+                  {currentClients.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeCurrentClient(idx)}
                       className="px-2 py-1 text-red-600 hover:text-red-800"
                     >
                       ✕
