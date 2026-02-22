@@ -29,7 +29,7 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
     <aside className={`bg-white border-r border-slate-200/60 flex flex-col z-20 hidden md:flex shrink-0 h-screen transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
       {/* Logo & Toggle */}
       <div className="px-4 py-5 flex items-center gap-3 relative">
-        <div className="size-8 text-primary flex items-center justify-center bg-primary/5 rounded-lg border border-primary/10 shrink-0">
+        <div className="size-8 text-black flex items-center justify-center bg-primary/5 rounded-lg border border-primary/10 shrink-0">
           <span className="material-symbols-outlined text-[20px]">
             auto_graph
           </span>
