@@ -10,19 +10,20 @@ interface SidebarProps {
   onToggle?: () => void;
 }
 
-const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
-  { icon: "dashboard", label: "Dashboard", page: "dashboard" },
-  { icon: "inventory_2", label: "Products", page: "products" },
-  { icon: "group", label: "LinkedIn", page: "linkedin-import" },
-  { icon: "wallet", label: "Billing", page: "billing" },
-  { icon: "settings", label: "Setup", page: "onboard" },
-];
-
 export default function Sidebar({ view, setView, collapsed = false, onToggle }: SidebarProps) {
   const { user } = useAuth();
 
+  const navItems: { icon: string; label: string; page: AppView["page"] }[] = [
+    { icon: "dashboard", label: "Dashboard", page: "dashboard" },
+    { icon: "inventory_2", label: "Products", page: "products" },
+    { icon: "wallet", label: "Billing", page: "billing" },
+    { icon: "group", label: "LinkedIn", page: "linkedin-import" },
+  ];
+
+  const isActive = (page: AppView["page"]) => view.page === page;
+
   return (
-    <aside className={`bg-white border-r border-slate-200/60 flex-col z-20 hidden md:flex shrink-0 h-screen transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
+    <aside className={`bg-white border-r border-slate-200/60 flex flex-col z-20 hidden md:flex shrink-0 h-screen transition-all duration-300 ${collapsed ? 'w-16' : 'w-64'}`}>
       {/* Logo & Toggle */}
       <div className="px-4 py-5 flex items-center gap-3 relative">
         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0">
@@ -55,7 +56,7 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
       {/* Nav */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-hide">
         {navItems.map((item) => {
-          const active = view.page === item.page;
+          const active = isActive(item.page);
           return (
             <button
               key={item.page}
@@ -78,7 +79,9 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle }: 
               {!collapsed && item.label}
             </button>
           );
-        })}
+        }        )}
+
+        {/* User */}
       </nav>
 
       {/* User */}

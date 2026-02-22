@@ -1,14 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
-
-interface Slide {
-  slide_number: number;
-  title: string;
-  body_html: string;
-  speaker_notes: string;
-}
+import { api, PitchSlide, Product } from "@/lib/api";
 
 interface PitchDeckEditorProps {
   leadId: number;
@@ -18,20 +11,34 @@ interface PitchDeckEditorProps {
 
 export default function PitchDeckEditor({
   leadId,
-  productId,
+  productId: initialProductId,
   onBack,
 }: PitchDeckEditorProps) {
-  const [slides, setSlides] = useState<Slide[]>([]);
+  const [slides, setSlides] = useState<PitchSlide[]>([]);
   const [activeSlide, setActiveSlide] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<number | undefined>(initialProductId);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  // Load available products if none was pre-selected
+  useEffect(() => {
+    api.getProducts().then(setProducts).catch(() => {});
+  }, []);
+
+  // Set the first product as default if none was provided
+  useEffect(() => {
+    if (!selectedProductId && products.length > 0) {
+      setSelectedProductId(products[0].id);
+    }
+  }, [products, selectedProductId]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const deck = await api.getPitchDeck(leadId, productId);
+        const deck = await api.getPitchDeck(leadId, selectedProductId);
         if (!cancelled && deck?.slides?.length) {
           setSlides(deck.slides);
         }
@@ -42,12 +49,12 @@ export default function PitchDeckEditor({
       }
     })();
     return () => { cancelled = true; };
-  }, [leadId, productId]);
+  }, [leadId, selectedProductId]);
 
   const handleExport = async () => {
     setExporting(true);
     try {
-      const blob = await api.downloadPitchDeck(leadId, productId);
+      const blob = await api.downloadPitchDeck(leadId, selectedProductId);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -62,11 +69,11 @@ export default function PitchDeckEditor({
   };
 
   const handleGenerate = async () => {
-    if (!productId) return;
+    if (!selectedProductId) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await api.generatePitchDeck(leadId, productId);
+      const result = await api.generatePitchDeck(leadId, selectedProductId);
       if (result?.slides?.length) {
         setSlides(result.slides);
         setActiveSlide(0);
@@ -107,15 +114,26 @@ export default function PitchDeckEditor({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {slides.length === 0 && !loading && (
-            <button
-              onClick={handleGenerate}
-              disabled={!productId}
-              className="flex items-center justify-center gap-2 h-8 px-3 bg-blue-600 text-white text-sm font-medium rounded-md transition-colors shadow-sm hover:bg-blue-700 disabled:opacity-50"
-            >
-              <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-              <span className="hidden sm:inline">Generate</span>
-            </button>
+          {slides.length === 0 && !loading && products.length > 0 && (
+            <>
+              <select
+                value={selectedProductId ?? ""}
+                onChange={(e) => setSelectedProductId(Number(e.target.value))}
+                className="h-8 px-2 text-sm border border-slate-200 rounded-md bg-white text-slate-700 focus:ring-1 focus:ring-slate-900 focus:border-slate-900"
+              >
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleGenerate}
+                disabled={!selectedProductId}
+                className="flex items-center justify-center gap-2 h-8 px-3 bg-blue-600 text-white text-sm font-medium rounded-md transition-colors shadow-sm hover:bg-blue-700 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                <span className="hidden sm:inline">Generate</span>
+              </button>
+            </>
           )}
           {slides.length > 0 && (
             <button
@@ -175,7 +193,7 @@ export default function PitchDeckEditor({
               <div className="flex flex-col items-center gap-4 text-slate-400">
                 <span className="material-symbols-outlined text-5xl">slideshow</span>
                 <span className="text-sm font-medium">No pitch deck generated yet</span>
-                {productId && (
+                {selectedProductId && (
                   <button
                     onClick={handleGenerate}
                     className="mt-2 px-4 py-2 bg-slate-900 text-white text-sm rounded-md hover:bg-slate-800 flex items-center gap-2"
