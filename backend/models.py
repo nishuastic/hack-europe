@@ -5,6 +5,7 @@ from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
+from sqlalchemy import event
 from sqlmodel import JSON, Column, Field, SQLModel
 
 
@@ -215,6 +216,20 @@ class Lead(SQLModel, table=True):
         if isinstance(v, list):
             return [BuyingSignal(**item) if isinstance(item, dict) else item for item in v]
         return v
+
+
+@event.listens_for(Lead, "load")
+def _receive_lead_load(target: "Lead", context: object) -> None:
+    if target.contacts and isinstance(target.contacts, list):
+        target.contacts = [
+            Contact(**item) if isinstance(item, dict) else item
+            for item in target.contacts
+        ]
+    if target.buying_signals and isinstance(target.buying_signals, list):
+        target.buying_signals = [
+            BuyingSignal(**item) if isinstance(item, dict) else item
+            for item in target.buying_signals
+        ]
 
 
 class Product(SQLModel, table=True):

@@ -315,12 +315,15 @@ async def autofill_product(
     from backend.enrichment.linkup_search import _get_client
 
     client = _get_client()
-    response = await client.async_search(
-        query=f"Extract product/service details from this page: {body.url}",
-        depth="standard",
-        output_type="structured",
-        structured_output_schema=json.dumps(PRODUCT_AUTOFILL_SCHEMA),
-    )
+    try:
+        response = await client.async_search(
+            query=f"Extract product/service details from this page: {body.url}",
+            depth="standard",
+            output_type="structured",
+            structured_output_schema=json.dumps(PRODUCT_AUTOFILL_SCHEMA),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LinkUp search failed: {e}")
     raw = response.output if hasattr(response, "output") else response
     data = json.loads(raw) if isinstance(raw, str) else raw
     return _clean_autofill(data)
@@ -335,12 +338,15 @@ async def autofill_company_profile(
     from backend.enrichment.linkup_search import _get_client
 
     client = _get_client()
-    response = await client.async_search(
-        query=f"Extract company information from this page: {body.url}",
-        depth="standard",
-        output_type="structured",
-        structured_output_schema=json.dumps(COMPANY_AUTOFILL_SCHEMA),
-    )
+    try:
+        response = await client.async_search(
+            query=f"Extract company information from this page: {body.url}",
+            depth="standard",
+            output_type="structured",
+            structured_output_schema=json.dumps(COMPANY_AUTOFILL_SCHEMA),
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LinkUp search failed: {e}")
     raw = response.output if hasattr(response, "output") else response
     data = json.loads(raw) if isinstance(raw, str) else raw
     return _clean_autofill(data)
@@ -950,7 +956,11 @@ async def create_email(
     ).scalar_one_or_none()
     reasoning = match_obj.match_reasoning if match_obj else ""
 
-    result = await generate_email(lead, product, reasoning)
+    try:
+        result = await generate_email(lead, product, reasoning)
+    except Exception as exc:
+        logger.exception("Email generation failed for lead %s / product %s: %s", lead_id, product_id, exc)
+        raise HTTPException(status_code=500, detail=f"Email generation failed: {exc}") from exc
     await deduct_credits(user.id, UsageEventType.EMAIL, session, {"lead_id": lead_id, "product_id": product_id})
 
     # Save to DB

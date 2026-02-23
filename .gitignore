@@ -30,3 +30,4 @@ Thumbs.db
 *.db
 # Prompt test results (raw API output)
 prompts/results/
+*.pptx

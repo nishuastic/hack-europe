@@ -87,7 +87,11 @@ def _build_lead_profile(lead: Lead) -> str:
     if lead.employees:
         sections.append(f"Employees: {lead.employees}")
     if lead.customers:
-        sections.append(f"Known customers: {', '.join(lead.customers)}")
+        customer_strs = [
+            c if isinstance(c, str) else (c.get("name", str(c)) if isinstance(c, dict) else str(c))
+            for c in lead.customers
+        ]
+        sections.append(f"Known customers: {', '.join(customer_strs)}")
     if lead.buying_signals:
         signals = []
         for s in lead.buying_signals:
