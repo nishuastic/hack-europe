@@ -88,7 +88,7 @@ app = FastAPI(title="Stick API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://frontend:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -119,11 +119,7 @@ async def _load_user_api_keys(
     from backend.encryption import decrypt
 
     assert user.id is not None
-    row = (
-        await session.execute(
-            select(UserApiKeys).where(UserApiKeys.user_id == user.id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(UserApiKeys).where(UserApiKeys.user_id == user.id))).scalar_one_or_none()
     anthropic_key = decrypt(row.encrypted_anthropic_key) if row and row.encrypted_anthropic_key else None
     linkup_key = decrypt(row.encrypted_linkup_key) if row and row.encrypted_linkup_key else None
     set_user_keys(anthropic_key, linkup_key)
@@ -148,11 +144,7 @@ async def save_api_keys(
     from backend.encryption import encrypt
 
     assert user.id is not None
-    row = (
-        await session.execute(
-            select(UserApiKeys).where(UserApiKeys.user_id == user.id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(UserApiKeys).where(UserApiKeys.user_id == user.id))).scalar_one_or_none()
     if row is None:
         row = UserApiKeys(user_id=user.id)
         session.add(row)
@@ -173,11 +165,7 @@ async def get_api_keys(
     from backend.encryption import decrypt
 
     assert user.id is not None
-    row = (
-        await session.execute(
-            select(UserApiKeys).where(UserApiKeys.user_id == user.id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(UserApiKeys).where(UserApiKeys.user_id == user.id))).scalar_one_or_none()
 
     def _mask(encrypted: str | None) -> str | None:
         if not encrypted:
@@ -198,11 +186,7 @@ async def delete_api_keys(
 ):
     """Remove all stored API keys for the current user."""
     assert user.id is not None
-    row = (
-        await session.execute(
-            select(UserApiKeys).where(UserApiKeys.user_id == user.id)
-        )
-    ).scalar_one_or_none()
+    row = (await session.execute(select(UserApiKeys).where(UserApiKeys.user_id == user.id))).scalar_one_or_none()
     if row:
         await session.delete(row)
         await session.commit()
@@ -563,9 +547,7 @@ async def update_icp_profile(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    icp = (
-        await session.execute(select(ICPProfile).where(ICPProfile.product_id == product_id))
-    ).scalar_one_or_none()
+    icp = (await session.execute(select(ICPProfile).where(ICPProfile.product_id == product_id))).scalar_one_or_none()
     if not icp:
         raise HTTPException(status_code=404, detail="ICP profile not found")
 
@@ -592,9 +574,7 @@ async def get_icp_profile(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    icp = (
-        await session.execute(select(ICPProfile).where(ICPProfile.product_id == product_id))
-    ).scalar_one_or_none()
+    icp = (await session.execute(select(ICPProfile).where(ICPProfile.product_id == product_id))).scalar_one_or_none()
     if not icp:
         return {"status": "no_icp"}
     return icp
@@ -1038,12 +1018,16 @@ async def list_emails(
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     rows = (
-        await session.execute(
-            select(GeneratedEmail)
-            .where(GeneratedEmail.lead_id == lead_id, GeneratedEmail.product_id == product_id)
-            .order_by(GeneratedEmail.created_at.desc())  # type: ignore[attr-defined]
+        (
+            await session.execute(
+                select(GeneratedEmail)
+                .where(GeneratedEmail.lead_id == lead_id, GeneratedEmail.product_id == product_id)
+                .order_by(GeneratedEmail.created_at.desc())  # type: ignore[attr-defined]
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return rows
 
 
@@ -1059,12 +1043,16 @@ async def get_latest_email(
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     email = (
-        await session.execute(
-            select(GeneratedEmail)
-            .where(GeneratedEmail.lead_id == lead_id, GeneratedEmail.product_id == product_id)
-            .order_by(GeneratedEmail.created_at.desc())  # type: ignore[attr-defined]
+        (
+            await session.execute(
+                select(GeneratedEmail)
+                .where(GeneratedEmail.lead_id == lead_id, GeneratedEmail.product_id == product_id)
+                .order_by(GeneratedEmail.created_at.desc())  # type: ignore[attr-defined]
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     if not email:
         raise HTTPException(status_code=404, detail="No email found")
     return email
@@ -1126,9 +1114,7 @@ async def list_linkedin_connections(
     user: User = Depends(get_current_user),
 ):
     """List all imported LinkedIn connections."""
-    result = await session.execute(
-        select(LinkedInConnection).where(LinkedInConnection.user_id == user.id)
-    )
+    result = await session.execute(select(LinkedInConnection).where(LinkedInConnection.user_id == user.id))
     return {"connections": result.scalars().all()}
 
 
@@ -1148,25 +1134,25 @@ async def list_linkedin_matches(
     # Enrich with connection and lead info
     enriched = []
     for m in matches:
-        conn = (await session.execute(
-            select(LinkedInConnection).where(LinkedInConnection.id == m.connection_id)
-        )).scalar_one_or_none()
-        lead = (await session.execute(
-            select(Lead).where(Lead.id == m.lead_id)
-        )).scalar_one_or_none()
+        conn = (
+            await session.execute(select(LinkedInConnection).where(LinkedInConnection.id == m.connection_id))
+        ).scalar_one_or_none()
+        lead = (await session.execute(select(Lead).where(Lead.id == m.lead_id))).scalar_one_or_none()
 
-        enriched.append({
-            "id": m.id,
-            "connection_id": m.connection_id,
-            "lead_id": m.lead_id,
-            "match_confidence": m.match_confidence,
-            "status": m.status,
-            "outreach_plan": m.outreach_plan,
-            "connection_name": f"{conn.first_name} {conn.last_name}" if conn else "Unknown",
-            "connection_position": conn.position if conn else None,
-            "connection_company": conn.company if conn else None,
-            "lead_company_name": lead.company_name if lead else "Unknown",
-        })
+        enriched.append(
+            {
+                "id": m.id,
+                "connection_id": m.connection_id,
+                "lead_id": m.lead_id,
+                "match_confidence": m.match_confidence,
+                "status": m.status,
+                "outreach_plan": m.outreach_plan,
+                "connection_name": f"{conn.first_name} {conn.last_name}" if conn else "Unknown",
+                "connection_position": conn.position if conn else None,
+                "connection_company": conn.company if conn else None,
+                "lead_company_name": lead.company_name if lead else "Unknown",
+            }
+        )
 
     return {"matches": enriched}
 
@@ -1178,15 +1164,13 @@ async def clear_linkedin_connections(
 ):
     """Clear all LinkedIn connections and matches for the current user."""
     # Delete matches first (foreign key)
-    matches = (await session.execute(
-        select(LinkedInMatch).where(LinkedInMatch.user_id == user.id)
-    )).scalars().all()
+    matches = (await session.execute(select(LinkedInMatch).where(LinkedInMatch.user_id == user.id))).scalars().all()
     for m in matches:
         await session.delete(m)
 
-    connections = (await session.execute(
-        select(LinkedInConnection).where(LinkedInConnection.user_id == user.id)
-    )).scalars().all()
+    connections = (
+        (await session.execute(select(LinkedInConnection).where(LinkedInConnection.user_id == user.id))).scalars().all()
+    )
     for c in connections:
         await session.delete(c)
 
@@ -1214,8 +1198,7 @@ async def get_global_impact(session: AsyncSession = Depends(get_session)):
     from backend.billing import paid_client
 
     rows = await session.execute(
-        select(UsageEvent.event_type, sa_func.count(UsageEvent.id))  # type: ignore[arg-type]
-        .group_by(UsageEvent.event_type)
+        select(UsageEvent.event_type, sa_func.count(UsageEvent.id)).group_by(UsageEvent.event_type)  # type: ignore[arg-type]
     )
     total_hours = 0.0
     total_actions = 0
@@ -1249,5 +1232,3 @@ async def trigger_predictions(session: AsyncSession = Depends(get_session), user
     assert user.id is not None
     create_task_with_context(predict_conversions(manager, session, user.id))
     return {"status": "prediction_started"}
-
-
