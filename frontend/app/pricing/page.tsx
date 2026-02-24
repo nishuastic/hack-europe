@@ -1,33 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
-
-interface TierPlan {
-  label: string;
-  price_id: string;
-  credits: number;
-  eur_display: string;
-  per_credit: string;
-}
-
-interface PaygPack {
-  label: string;
-  price_id: string;
-  credits: number;
-  eur_display: string;
-  per_credit: string;
-}
-
-interface BillingData {
-  currency: string;
-  credits_remaining: number;
-  costs: Record<string, number>;
-  tiers: Record<string, TierPlan>;
-  payg_packs: Record<string, PaygPack>;
-  subscription?: { active_tier: string | null; status: string | null };
-}
 
 const FEATURES = [
   { name: "Credits per month", starter: "500", growth: "2,500", enterprise: "10,000" },
@@ -43,17 +17,61 @@ const FEATURES = [
 
 export default function PricingPage() {
   const router = useRouter();
-  const [billingData, setBillingData] = useState<BillingData | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    api.getBillingCredits()
-      .then(setBillingData)
-      .catch((err) => console.error("Failed to load billing:", err))
-      .finally(() => setLoading(false));
-  }, []);
+  const tiers = {
+    starter: {
+      label: "Stick Starter",
+      price_id: "price_1T3NMyLz0lFEuRtxYy50V3cd",
+      credits: 500,
+      eur_display: "€29/mo",
+      per_credit: "€0.058",
+    },
+    growth: {
+      label: "Stick Growth",
+      price_id: "price_1T3NMzLz0lFEuRtxGSokBEtE",
+      credits: 2000,
+      eur_display: "€89/mo",
+      per_credit: "€0.045",
+    },
+    scale: {
+      label: "Stick Scale",
+      price_id: "price_1T3NN0Lz0lFEuRtxyQJmvFcm",
+      credits: 10000,
+      eur_display: "€349/mo",
+      per_credit: "€0.035",
+    },
+  };
 
-  const tiers = billingData?.tiers || {};
+  const paygPacks = {
+    "100": {
+      label: "100 Stick Credits",
+      price_id: "price_1T3NN0Lz0lFEuRtxCRPCPrFA",
+      credits: 100,
+      eur_display: "€9.99",
+      per_credit: "€0.100",
+    },
+    "500": {
+      label: "500 Stick Credits",
+      price_id: "price_1T3NN1Lz0lFEuRtxBxthtqU0",
+      credits: 500,
+      eur_display: "€39.99",
+      per_credit: "€0.080",
+    },
+    "2000": {
+      label: "2,000 Stick Credits",
+      price_id: "price_1T3NN1Lz0lFEuRtxHbKHWIUg",
+      credits: 2000,
+      eur_display: "€129.99",
+      per_credit: "€0.065",
+    },
+    "5000": {
+      label: "5,000 Stick Credits",
+      price_id: "price_1T3NN2Lz0lFEuRtxAGJcAHCP",
+      credits: 5000,
+      eur_display: "€249.99",
+      per_credit: "€0.050",
+    },
+  };
 
   return (
     <div className="min-h-screen w-full bg-[#f8f9fa]" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
@@ -113,13 +131,6 @@ export default function PricingPage() {
               Start for free. Pay only for what you use. No hidden fees, cancel anytime.
             </p>
           </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-800"></div>
-            </div>
-          ) : (
-            <>
               {/* Pay-as-you-go - Prominent */}
               <div className="mb-20">
                 <div className="text-center mb-8">
@@ -132,7 +143,7 @@ export default function PricingPage() {
                   <p className="mt-2 text-slate-500">Buy credits upfront. No expiration. Use anytime.</p>
                 </div>
                 <div className="grid md:grid-cols-4 gap-6 max-w-4xl mx-auto">
-                  {Object.entries(billingData?.payg_packs || {}).map(([key, pack]) => (
+                  {Object.entries(paygPacks).map(([key, pack]) => (
                     <div
                       key={key}
                       className="bg-white border-2 border-slate-200 rounded-2xl p-8 hover:border-slate-400 transition-colors"
@@ -263,9 +274,7 @@ export default function PricingPage() {
                   </tbody>
                 </table>
               </div>
-            </>
-          )}
-        </div>
+            </div>
       </section>
 
       {/* CTA */}
