@@ -5,23 +5,12 @@ import json
 import logging
 from typing import Any
 
-import anthropic
-
-from backend.config import settings
+from backend.api_keys import make_claude_client as _get_claude_client
+from backend.api_keys import make_linkup_client as _get_client
 from backend.discovery.prompts import build_discovery_prompt, build_evaluation_prompt
-from backend.enrichment.linkup_search import _get_client
 from backend.models import CompanyProfile, Product
 
 logger = logging.getLogger(__name__)
-
-_aclient: anthropic.AsyncAnthropic | None = None
-
-
-def _get_claude_client() -> anthropic.AsyncAnthropic:
-    global _aclient
-    if _aclient is None:
-        _aclient = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    return _aclient
 
 
 # ─── LinkUp Search Schema ─────────────────────────────────────────────────

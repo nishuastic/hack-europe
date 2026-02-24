@@ -8,7 +8,6 @@ const navItems = [
   { icon: "dashboard", label: "Dashboard", href: "/dashboard" },
   { icon: "inventory_2", label: "Products", href: "/products" },
   { icon: "analytics", label: "Analytics", href: "/analytics" },
-  { icon: "wallet", label: "Billing", href: "/billing" },
   { icon: "group", label: "LinkedIn", href: "/linkedin-import" },
 ];
 

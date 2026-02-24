@@ -4,21 +4,10 @@ import json
 import logging
 import re
 
-import anthropic
-
-from backend.config import settings
+from backend.api_keys import make_claude_client as _get_claude_client
 from backend.matching.pipeline import _build_lead_profile
 
 logger = logging.getLogger(__name__)
-
-_aclient: anthropic.AsyncAnthropic | None = None
-
-
-def _get_claude_client() -> anthropic.AsyncAnthropic:
-    global _aclient
-    if _aclient is None:
-        _aclient = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    return _aclient
 
 
 # ─── Prompt (inline fallback) ────────────────────────────────────────────

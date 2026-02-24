@@ -532,51 +532,6 @@ class ApiClient {
     });
   }
 
-  async getBillingCredits(): Promise<{
-    currency: string;
-    credits_remaining: number;
-    costs: Record<string, number>;
-    tiers: Record<string, { label: string; price_id: string; credits: number; eur_display: string; per_credit: string }>;
-    payg_packs: Record<string, { label: string; price_id: string; credits: number; eur_display: string; per_credit: string }>;
-  }> {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/credits`);
-    if (!res.ok) throw new Error("Failed to load billing credits");
-    return res.json();
-  }
-
-  async createTierCheckout(tier: string): Promise<string> {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/subscribe`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tier }),
-    });
-    if (!res.ok) throw new Error("Failed to create checkout");
-    const data = await res.json();
-    return data.checkout_url;
-  }
-
-  async createCustomCreditCheckout(credits: number): Promise<string> {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/buy-custom-credits`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ credits }),
-    });
-    if (!res.ok) throw new Error("Failed to create checkout");
-    const data = await res.json();
-    return data.checkout_url;
-  }
-
-  async createPaygCheckout(pack: string): Promise<string> {
-    const res = await this.fetchWithAuth(`${API_BASE}/api/billing/buy-credits`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pack }),
-    });
-    if (!res.ok) throw new Error("Failed to create checkout");
-    const data = await res.json();
-    return data.checkout_url;
-  }
-
   async getAnalytics(): Promise<AnalyticsData> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/analytics`);
     return res.json();
@@ -595,6 +550,7 @@ class ApiClient {
     value_proposition?: string;
   }> {
     const res = await this.fetchWithAuth(`${API_BASE}/api/company-profile`);
+    if (!res.ok) return {};
     return res.json();
   }
 
@@ -610,6 +566,10 @@ class ApiClient {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(profile),
     });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Failed to save profile" }));
+      throw new Error(err.detail || "Failed to save profile");
+    }
     return res.json();
   }
 
@@ -728,6 +688,31 @@ class ApiClient {
       const err = await res.json().catch(() => ({ detail: "ICP learning failed" }));
       throw new Error(err.detail || "ICP learning failed");
     }
+  }
+
+  // ─── BYOK: API key management ──────────────────────────────────────
+
+  async saveApiKeys(keys: { anthropic_api_key?: string; linkup_api_key?: string }): Promise<void> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/settings/api-keys`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(keys),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: "Failed to save API keys" }));
+      throw new Error(err.detail || "Failed to save API keys");
+    }
+  }
+
+  async getApiKeys(): Promise<{ anthropic_api_key: string | null; linkup_api_key: string | null }> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/settings/api-keys`);
+    if (!res.ok) throw new Error("Failed to load API keys");
+    return res.json();
+  }
+
+  async deleteApiKeys(): Promise<void> {
+    const res = await this.fetchWithAuth(`${API_BASE}/api/settings/api-keys`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete API keys");
   }
 }
 

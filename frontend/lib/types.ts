@@ -6,6 +6,5 @@ export type AppView =
   | { page: 'generation-run-detail'; runId: number }
   | { page: 'lead-detail'; leadId: number; runId?: number }
   | { page: 'pitch-editor'; leadId: number; productId?: number }
-  | { page: 'billing' }
   | { page: 'analytics' }
   | { page: 'linkedin-import' };

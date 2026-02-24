@@ -1,19 +1,19 @@
 """Stick API — FastAPI application with WebSocket streaming."""
 
-import asyncio
 import json
 import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from backend.api_keys import create_task_with_context, set_user_keys
 from backend.auth import (
     create_access_token,
     create_refresh_token,
@@ -21,20 +21,7 @@ from backend.auth import (
     hash_password,
     verify_password,
 )
-from backend.billing import (
-    CREDIT_COSTS,
-    HOURS_SAVED,
-    PAYG_PACKS,
-    SDR_HOURLY_RATE,
-    TIER_PLANS,
-    check_credits,
-    create_custom_credit_checkout,
-    create_payg_checkout,
-    create_tier_checkout,
-    deduct_credits,
-    ensure_customer,
-    handle_stripe_webhook,
-)
+from backend.billing import HOURS_SAVED, SDR_HOURLY_RATE
 from backend.config import settings  # noqa: F401 — used in refresh endpoint
 from backend.db import get_session, init_db
 from backend.discovery.discovery_pipeline import run_discovery
@@ -54,6 +41,7 @@ from backend.models import (
     UsageEvent,
     UsageEventType,
     User,
+    UserApiKeys,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -120,6 +108,107 @@ async def websocket_endpoint(ws: WebSocket):
         manager.disconnect(ws)
 
 
+# ─── BYOK: load user API keys into contextvars per request ────────────
+
+
+async def _load_user_api_keys(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> User:
+    """FastAPI dependency — sets contextvars with the authenticated user's API keys."""
+    from backend.encryption import decrypt
+
+    assert user.id is not None
+    row = (
+        await session.execute(
+            select(UserApiKeys).where(UserApiKeys.user_id == user.id)
+        )
+    ).scalar_one_or_none()
+    anthropic_key = decrypt(row.encrypted_anthropic_key) if row and row.encrypted_anthropic_key else None
+    linkup_key = decrypt(row.encrypted_linkup_key) if row and row.encrypted_linkup_key else None
+    set_user_keys(anthropic_key, linkup_key)
+    return user
+
+
+# ─── BYOK: API key management endpoints ──────────────────────────────
+
+
+class SaveApiKeysRequest(BaseModel):
+    anthropic_api_key: str | None = None
+    linkup_api_key: str | None = None
+
+
+@app.put("/api/settings/api-keys")
+async def save_api_keys(
+    body: SaveApiKeysRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Save (encrypted) user-provided API keys."""
+    from backend.encryption import encrypt
+
+    assert user.id is not None
+    row = (
+        await session.execute(
+            select(UserApiKeys).where(UserApiKeys.user_id == user.id)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        row = UserApiKeys(user_id=user.id)
+        session.add(row)
+    if body.anthropic_api_key is not None:
+        row.encrypted_anthropic_key = encrypt(body.anthropic_api_key) if body.anthropic_api_key else None
+    if body.linkup_api_key is not None:
+        row.encrypted_linkup_key = encrypt(body.linkup_api_key) if body.linkup_api_key else None
+    await session.commit()
+    return {"status": "saved"}
+
+
+@app.get("/api/settings/api-keys")
+async def get_api_keys(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Return masked API keys (last 4 chars only)."""
+    from backend.encryption import decrypt
+
+    assert user.id is not None
+    row = (
+        await session.execute(
+            select(UserApiKeys).where(UserApiKeys.user_id == user.id)
+        )
+    ).scalar_one_or_none()
+
+    def _mask(encrypted: str | None) -> str | None:
+        if not encrypted:
+            return None
+        plain = decrypt(encrypted)
+        return f"{'*' * max(0, len(plain) - 4)}{plain[-4:]}" if len(plain) > 4 else "****"
+
+    return {
+        "anthropic_api_key": _mask(row.encrypted_anthropic_key) if row else None,
+        "linkup_api_key": _mask(row.encrypted_linkup_key) if row else None,
+    }
+
+
+@app.delete("/api/settings/api-keys")
+async def delete_api_keys(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+):
+    """Remove all stored API keys for the current user."""
+    assert user.id is not None
+    row = (
+        await session.execute(
+            select(UserApiKeys).where(UserApiKeys.user_id == user.id)
+        )
+    ).scalar_one_or_none()
+    if row:
+        await session.delete(row)
+        await session.commit()
+    return {"status": "deleted"}
+
+
 # ─── Auth Schemas & Routes ────────────────────────────────────────────
 
 
@@ -148,8 +237,6 @@ async def register(body: RegisterRequest, session: AsyncSession = Depends(get_se
     await session.commit()
     await session.refresh(user)
     assert user.id is not None
-    # Initialize free credits + create Paid.ai & Stripe customers
-    await ensure_customer(user.id, user.email, user.name, session)
     access = create_access_token(user.id, user.email)
     refresh = create_refresh_token(user.id)
     return {
@@ -309,7 +396,7 @@ def _clean_autofill(data: dict) -> dict:
 @app.post("/api/autofill/product")
 async def autofill_product(
     body: AutofillURLRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Extract product details from a URL using LinkUp structured search."""
     from backend.enrichment.linkup_search import _get_client
@@ -332,7 +419,7 @@ async def autofill_product(
 @app.post("/api/autofill/company-profile")
 async def autofill_company_profile(
     body: AutofillURLRequest,
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Extract company profile details from a URL using LinkUp structured search."""
     from backend.enrichment.linkup_search import _get_client
@@ -428,7 +515,7 @@ async def delete_product(
 async def learn_icp(
     product_id: int,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Trigger ICP learning for a product based on its current_clients."""
     assert user.id is not None
@@ -440,25 +527,13 @@ async def learn_icp(
     if not product.current_clients or len(product.current_clients) == 0:
         raise HTTPException(status_code=400, detail="Product has no current_clients to learn from")
 
-    # Credit check: 3 credits per customer
-    total_cost = len(product.current_clients) * CREDIT_COSTS[UsageEventType.ICP_RESEARCH]
-    if not await check_credits(user.id, UsageEventType.ICP_RESEARCH, session, quantity=len(product.current_clients)):
-        raise HTTPException(status_code=402, detail=f"Insufficient credits for ICP research (need {total_cost} SC)")
-
-    await deduct_credits(
-        user.id, UsageEventType.ICP_RESEARCH, session,
-        {"product_id": product_id, "customers": len(product.current_clients)},
-        quantity=len(product.current_clients),
-    )
-
     from backend.icp.icp_pipeline import run_icp_learning
 
-    asyncio.create_task(run_icp_learning(product_id, manager))
+    create_task_with_context(run_icp_learning(product_id, manager))
     return {
         "status": "icp_learning_started",
         "product_id": product_id,
         "customers_to_research": len(product.current_clients),
-        "credits_used": total_cost,
     }
 
 
@@ -589,7 +664,7 @@ async def get_generation_run(
 async def run_discovery_endpoint(
     body: DiscoveryRequest,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Kick off ICP-based company discovery. Creates a GenerationRun, then fire-and-forget."""
     assert user.id is not None
@@ -640,7 +715,9 @@ async def run_discovery_endpoint(
     await session.commit()
     await session.refresh(run)
 
-    asyncio.create_task(run_discovery(body.product_ids, body.max_companies, manager, user.id, generation_run_id=run.id))
+    create_task_with_context(
+        run_discovery(body.product_ids, body.max_companies, manager, user.id, generation_run_id=run.id)
+    )
     return {
         "status": "discovery_started",
         "max_companies": body.max_companies,
@@ -653,7 +730,7 @@ async def discover_more_for_run(
     run_id: int,
     body: DiscoveryRequest,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Append more discovered companies to an existing GenerationRun."""
     assert user.id is not None
@@ -669,7 +746,7 @@ async def discover_more_for_run(
 
     # Use run's original product_ids so discovery stays consistent
     product_ids = run.product_ids or None
-    asyncio.create_task(run_discovery(product_ids, body.max_companies, manager, user.id, generation_run_id=run_id))
+    create_task_with_context(run_discovery(product_ids, body.max_companies, manager, user.id, generation_run_id=run_id))
     return {
         "status": "discovery_started",
         "max_companies": body.max_companies,
@@ -682,7 +759,7 @@ async def discover_more_for_run(
 
 @app.post("/api/leads/import")
 async def import_leads(
-    body: LeadImport, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+    body: LeadImport, session: AsyncSession = Depends(get_session), user: User = Depends(_load_user_api_keys)
 ):
     lead_ids: list[int] = []
     for company in body.companies:
@@ -706,22 +783,8 @@ async def import_leads(
             session.add(run)
             await session.commit()
 
-    # Deduct enrichment credits for all leads (5 SC each)
-    assert user.id is not None
-    if not await check_credits(user.id, UsageEventType.ENRICHMENT, session, quantity=len(lead_ids)):
-        enrich_cost = len(lead_ids) * CREDIT_COSTS[UsageEventType.ENRICHMENT]
-        raise HTTPException(
-            status_code=402,
-            detail=f"Insufficient credits (need {enrich_cost} SC for {len(lead_ids)} enrichments)",
-        )
-    await deduct_credits(
-        user.id, UsageEventType.ENRICHMENT, session,
-        {"lead_ids": lead_ids},
-        quantity=len(lead_ids),
-    )
-
     # Fire-and-forget enrichment
-    asyncio.create_task(enrich_leads(lead_ids, manager))
+    create_task_with_context(enrich_leads(lead_ids, manager))
 
     return {"leads_created": len(lead_ids), "lead_ids": lead_ids, "status": "enrichment_started"}
 
@@ -749,20 +812,15 @@ async def get_lead(lead_id: int, session: AsyncSession = Depends(get_session), u
 
 @app.post("/api/leads/{lead_id}/enrich")
 async def trigger_enrich(
-    lead_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)
+    lead_id: int, session: AsyncSession = Depends(get_session), user: User = Depends(_load_user_api_keys)
 ):
     """Re-trigger enrichment for a single lead."""
     assert user.id is not None
-    if not await check_credits(user.id, UsageEventType.ENRICHMENT, session):
-        raise HTTPException(status_code=402, detail="Insufficient credits for enrichment")
-
     lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     if lead.enrichment_status == EnrichmentStatus.IN_PROGRESS:
         raise HTTPException(status_code=409, detail="Enrichment already in progress")
-
-    await deduct_credits(user.id, UsageEventType.ENRICHMENT, session, {"lead_id": lead_id})
 
     # Reset status
     lead.enrichment_status = EnrichmentStatus.PENDING
@@ -770,7 +828,7 @@ async def trigger_enrich(
     await session.commit()
 
     # Fire-and-forget
-    asyncio.create_task(enrich_lead(lead_id, manager))
+    create_task_with_context(enrich_lead(lead_id, manager))
     return {"lead_id": lead_id, "status": "enrichment_started"}
 
 
@@ -780,18 +838,13 @@ async def trigger_enrich(
 @app.post("/api/matches/generate")
 async def trigger_matching(
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Generate matches for all enriched leads against all products. Fire-and-forget."""
     assert user.id is not None
-    if not await check_credits(user.id, UsageEventType.MATCHING, session):
-        raise HTTPException(status_code=402, detail="Insufficient credits for matching")
-
-    await deduct_credits(user.id, UsageEventType.MATCHING, session)
-
     from backend.matching.pipeline import generate_all_matches
 
-    asyncio.create_task(generate_all_matches(manager, user.id))
+    create_task_with_context(generate_all_matches(manager, user.id))
     return {"status": "matching_started"}
 
 
@@ -821,13 +874,10 @@ async def create_pitch_deck(
     lead_id: int,
     product_id: int = Query(...),
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Generate a pitch deck for a lead-product pair. Awaited (not fire-and-forget)."""
     assert user.id is not None
-    if not await check_credits(user.id, UsageEventType.PITCH_DECK, session):
-        raise HTTPException(status_code=402, detail="Insufficient credits for pitch deck generation")
-
     from backend.actions.pitch_deck import generate_pitch_deck
 
     lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
@@ -855,7 +905,6 @@ async def create_pitch_deck(
     reasoning = match_obj.match_reasoning if match_obj else "No prior match — generate general pitch."
 
     result = await generate_pitch_deck(lead, product, reasoning)
-    await deduct_credits(user.id, UsageEventType.PITCH_DECK, session, {"lead_id": lead_id, "product_id": product_id})
 
     # Save to DB
     deck = PitchDeck(
@@ -923,13 +972,10 @@ async def create_email(
     lead_id: int,
     product_id: int = Query(...),
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Generate an outreach email for a lead-product pair."""
     assert user.id is not None
-    if not await check_credits(user.id, UsageEventType.EMAIL, session):
-        raise HTTPException(status_code=402, detail="Insufficient credits for email generation")
-
     from backend.actions.email_generator import generate_email
 
     lead = (await session.execute(select(Lead).where(Lead.id == lead_id, Lead.user_id == user.id))).scalar_one_or_none()
@@ -961,7 +1007,6 @@ async def create_email(
     except Exception as exc:
         logger.exception("Email generation failed for lead %s / product %s: %s", lead_id, product_id, exc)
         raise HTTPException(status_code=500, detail=f"Email generation failed: {exc}") from exc
-    await deduct_credits(user.id, UsageEventType.EMAIL, session, {"lead_id": lead_id, "product_id": product_id})
 
     # Save to DB
     email_record = GeneratedEmail(
@@ -1032,7 +1077,7 @@ async def get_latest_email(
 async def import_linkedin(
     file: UploadFile,
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Upload a LinkedIn data export (ZIP or CSV) and start the import pipeline."""
     from backend.db import async_session as session_factory
@@ -1053,14 +1098,14 @@ async def import_linkedin(
     if not connections:
         raise HTTPException(status_code=400, detail="No connections found in file")
 
-    asyncio.create_task(process_linkedin_import(user.id, connections, manager, session_factory))
+    create_task_with_context(process_linkedin_import(user.id, connections, manager, session_factory))
     return {"status": "import_started", "connections_found": len(connections)}
 
 
 @app.post("/api/linkedin/demo")
 async def import_linkedin_demo(
     session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
+    user: User = Depends(_load_user_api_keys),
 ):
     """Import mock LinkedIn data for demo purposes."""
     from backend.db import async_session as session_factory
@@ -1071,7 +1116,7 @@ async def import_linkedin_demo(
     assert user.id is not None
     csv_text = generate_mock_csv_text()
     connections = parse_connections_csv(csv_text)
-    asyncio.create_task(process_linkedin_import(user.id, connections, manager, session_factory))
+    create_task_with_context(process_linkedin_import(user.id, connections, manager, session_factory))
     return {"status": "demo_import_started", "connections_found": len(connections)}
 
 
@@ -1197,123 +1242,12 @@ async def get_global_impact(session: AsyncSession = Depends(get_session)):
 
 
 @app.post("/api/analytics/predict")
-async def trigger_predictions(session: AsyncSession = Depends(get_session), user: User = Depends(get_current_user)):
+async def trigger_predictions(session: AsyncSession = Depends(get_session), user: User = Depends(_load_user_api_keys)):
     """Predict conversion likelihood for matches missing predictions."""
     from backend.analytics import predict_conversions
 
     assert user.id is not None
-    asyncio.create_task(predict_conversions(manager, session, user.id))
+    create_task_with_context(predict_conversions(manager, session, user.id))
     return {"status": "prediction_started"}
 
 
-# ─── Billing ─────────────────────────────────────────────────────────
-
-
-class TierCheckoutRequest(BaseModel):
-    tier: str  # "starter", "growth", "scale"
-
-
-class PaygCheckoutRequest(BaseModel):
-    pack: str  # "100", "500", "2000", "5000"
-
-
-class CustomCreditRequest(BaseModel):
-    credits: int  # 100–100000
-
-
-@app.get("/api/billing/credits")
-async def get_credits(
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    """Get current user's credit balance + available plans and packs."""
-    assert user.id is not None
-    credits = await ensure_customer(user.id, user.email, user.name, session)
-    return {
-        "currency": "stick_credits",
-        "credits_remaining": credits.credits_remaining,
-        "costs": {k.value: v for k, v in CREDIT_COSTS.items()},
-        "tiers": TIER_PLANS,
-        "payg_packs": PAYG_PACKS,
-        "subscription": {
-            "active_tier": credits.active_tier,
-            "status": credits.subscription_status,
-            "subscription_id": credits.stripe_subscription_id,
-        }
-        if credits.active_tier
-        else None,
-    }
-
-
-@app.post("/api/billing/subscribe")
-async def subscribe_tier(
-    body: TierCheckoutRequest,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    """Create a Stripe Checkout session for a monthly tier subscription."""
-    assert user.id is not None
-    await ensure_customer(user.id, user.email, user.name, session)
-    url = await create_tier_checkout(user.id, body.tier, session)
-    return {"checkout_url": url}
-
-
-@app.post("/api/billing/buy-credits")
-async def buy_credits(
-    body: PaygCheckoutRequest,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    """Create a Stripe Checkout session for a one-time credit pack purchase."""
-    assert user.id is not None
-    await ensure_customer(user.id, user.email, user.name, session)
-    url = await create_payg_checkout(user.id, body.pack, session)
-    return {"checkout_url": url}
-
-
-@app.post("/api/billing/buy-custom-credits")
-async def buy_custom_credits(
-    body: CustomCreditRequest,
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    """Create a Stripe Checkout session for a custom credit amount (100–100k)."""
-    assert user.id is not None
-    if body.credits < 100 or body.credits > 100_000:
-        raise HTTPException(status_code=400, detail="Credits must be between 100 and 100,000")
-    await ensure_customer(user.id, user.email, user.name, session)
-    url = await create_custom_credit_checkout(user.id, body.credits, session)
-    return {"checkout_url": url}
-
-
-@app.post("/api/billing/webhook")
-async def stripe_webhook(request: Request, session: AsyncSession = Depends(get_session)):
-    """Handle Stripe webhook events (adds credits on successful payment)."""
-    payload = await request.body()
-    sig = request.headers.get("stripe-signature", "")
-    try:
-        result = await handle_stripe_webhook(payload, sig, session)
-        return result
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid signature")
-
-
-@app.get("/api/billing/usage")
-async def get_usage(
-    session: AsyncSession = Depends(get_session),
-    user: User = Depends(get_current_user),
-):
-    """Get usage history for current user."""
-    assert user.id is not None
-    result = await session.execute(
-        select(UsageEvent).where(UsageEvent.user_id == user.id).order_by(UsageEvent.created_at.desc())  # type: ignore[attr-defined]
-    )
-    events = result.scalars().all()
-    return {
-        "usage": [
-            {"event_type": e.event_type, "credits_used": e.credits_used, "created_at": str(e.created_at)}
-            for e in events
-        ]
-    }

@@ -15,7 +15,6 @@ import Onboard from "@/components/Onboard";
 import Products from "@/components/Products";
 import ProductEdit from "@/components/ProductEdit";
 import LinkedInImport from "@/components/LinkedInImport";
-import Billing from "@/components/Billing";
 import Analytics from "@/components/Analytics";
 function serializeView(view: AppView): string {
   switch (view.page) {
@@ -40,7 +39,6 @@ function parseHash(hash: string): AppView | null {
   switch (page) {
     case "dashboard":
     case "products":
-    case "billing":
     case "analytics":
     case "linkedin-import":
     case "onboard":
@@ -205,11 +203,6 @@ function AppPageInner() {
           {view.page === "analytics" && (
             <div className="p-6 md:p-8">
               <Analytics onSelectLead={(id) => goTo({ page: "lead-detail", leadId: id })} />
-            </div>
-          )}
-          {view.page === "billing" && (
-            <div className="p-6 md:p-8">
-              <Billing />
             </div>
           )}
         </div>

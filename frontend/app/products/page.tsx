@@ -34,7 +34,6 @@ export default function ProductsPage() {
         view={{ page: "products" }}
         setView={(v) => {
           if (v.page === "dashboard") router.push("/dashboard");
-          if (v.page === "billing") router.push("/billing");
           if (v.page === "analytics") router.push("/analytics");
           if (v.page === "linkedin-import") router.push("/app");
           if (v.page === "onboard") router.push("/?view=onboard");

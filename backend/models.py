@@ -59,6 +59,15 @@ class UserCredits(SQLModel, table=True):
     subscription_status: Optional[str] = None
 
 
+class UserApiKeys(SQLModel, table=True):
+    """Encrypted API keys supplied by the user (BYOK demo mode)."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", unique=True, index=True)
+    encrypted_anthropic_key: str | None = None
+    encrypted_linkup_key: str | None = None
+
+
 class UsageEvent(SQLModel, table=True):
     """Records each billable action for usage history."""
 

@@ -4,25 +4,15 @@ import json
 import logging
 import re
 
-import anthropic
 from sqlalchemy import func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
+from backend.api_keys import make_claude_client as _get_claude_client
 from backend.billing import HOURS_SAVED, SDR_HOURLY_RATE
-from backend.config import settings
 from backend.models import GenerationRun, Lead, Product, ProductMatch, UsageEvent, UsageEventType
 
 logger = logging.getLogger(__name__)
-
-_aclient: anthropic.AsyncAnthropic | None = None
-
-
-def _get_claude_client() -> anthropic.AsyncAnthropic:
-    global _aclient
-    if _aclient is None:
-        _aclient = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    return _aclient
 
 
 async def get_analytics(session: AsyncSession, user_id: int) -> dict:

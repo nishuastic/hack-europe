@@ -21,7 +21,6 @@ export default function Sidebar({ view, setView, collapsed = false, onToggle, on
     { icon: "dashboard", label: "Dashboard", page: "dashboard" },
     { icon: "inventory_2", label: "Products", page: "products" },
     { icon: "analytics", label: "Analytics", page: "analytics" },
-    { icon: "wallet", label: "Billing", page: "billing" },
     { icon: "group", label: "LinkedIn", page: "linkedin-import" },
   ];
 

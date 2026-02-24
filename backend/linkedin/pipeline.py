@@ -5,7 +5,6 @@ import logging
 
 from sqlmodel import select
 
-from backend.billing import check_credits, deduct_credits
 from backend.linkedin.matching import find_matches
 from backend.linkedin.outreach_generator import generate_outreach_plan
 from backend.models import (
@@ -15,7 +14,6 @@ from backend.models import (
     LinkedInMatch,
     LinkedInMatchStatus,
     ProductMatch,
-    UsageEventType,
 )
 
 logger = logging.getLogger(__name__)
@@ -141,15 +139,7 @@ async def process_linkedin_import(
                 nonlocal outreach_count
                 async with sem:
                     try:
-                        # Check credits
                         async with session_factory() as gen_session:  # type: ignore[operator]
-                            has_credits = await check_credits(
-                                user_id, UsageEventType.LINKEDIN_OUTREACH, gen_session
-                            )
-                            if not has_credits:
-                                logger.warning("Insufficient credits for outreach, skipping match %s", match_rec.id)
-                                return
-
                             conn_rec = conn_by_id.get(match_rec.connection_id)
                             lead_rec = lead_by_id.get(match_rec.lead_id)
                             if not conn_rec or not lead_rec:
@@ -202,10 +192,6 @@ async def process_linkedin_import(
                             match_db.outreach_plan = outreach.model_dump()  # type: ignore[assignment]
                             match_db.status = LinkedInMatchStatus.COMPLETE
                             gen_session.add(match_db)
-                            await deduct_credits(
-                                user_id, UsageEventType.LINKEDIN_OUTREACH, gen_session,
-                                {"match_id": match_rec.id},
-                            )
                             await gen_session.commit()
                             outreach_count += 1
 

@@ -1,15 +1,5 @@
-"""LinkUp SDK client — lazy singleton used by search_executor agent."""
+"""LinkUp SDK client — per-request factory using BYOK contextvars."""
 
-from linkup import LinkupClient
+from backend.api_keys import make_linkup_client as _get_client
 
-from backend.config import settings
-
-_client: LinkupClient | None = None
-
-
-def _get_client() -> LinkupClient:
-    """Lazy-initialize and return the LinkUp client singleton."""
-    global _client
-    if _client is None:
-        _client = LinkupClient(api_key=settings.linkup_api_key)
-    return _client
+__all__ = ["_get_client"]

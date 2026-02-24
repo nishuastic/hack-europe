@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useAuth } from "./AuthContext";
 import { api } from "../lib/api";
 
 export default function Onboard() {
+  const { user } = useAuth();
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [stage, setStage] = useState("Series A");
@@ -13,10 +15,27 @@ export default function Onboard() {
   const [autofilling, setAutofilling] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  // BYOK state
+  const [anthropicKey, setAnthropicKey] = useState("");
+  const [linkupKey, setLinkupKey] = useState("");
+  const [maskedAnthropic, setMaskedAnthropic] = useState<string | null>(null);
+  const [maskedLinkup, setMaskedLinkup] = useState<string | null>(null);
+  const [savingKeys, setSavingKeys] = useState(false);
+  const [keysSaved, setKeysSaved] = useState(false);
+  const [keysError, setKeysError] = useState("");
 
   const stages = ["Pre-Seed", "Seed", "Series A", "Series B+", "Public"];
 
   useEffect(() => {
+    if (!user) return;
+    // Reset form when user changes (e.g. logout + login)
+    setCompanyName("");
+    setWebsite("");
+    setStage("Series A");
+    setGeography("");
+    setValueProp("");
     api
       .getCompanyProfile()
       .then((profile) => {
@@ -26,10 +45,18 @@ export default function Onboard() {
         if (profile.geography) setGeography(profile.geography);
         if (profile.value_proposition) setValueProp(profile.value_proposition);
       })
-      .catch(() => {
-        // Backend not available, keep defaults
+      .catch((err) => {
+        console.error("Failed to load company profile:", err);
       });
-  }, []);
+    // Load saved API keys (masked)
+    api
+      .getApiKeys()
+      .then((keys) => {
+        setMaskedAnthropic(keys.anthropic_api_key);
+        setMaskedLinkup(keys.linkup_api_key);
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   const handleAutofill = async () => {
     if (!autofillUrl.trim()) return;
@@ -52,6 +79,7 @@ export default function Onboard() {
     if (!companyName.trim()) return;
     setSaving(true);
     setSaved(false);
+    setSaveError("");
     try {
       await api.saveCompanyProfile({
         company_name: companyName.trim(),
@@ -63,9 +91,47 @@ export default function Onboard() {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save profile";
+      setSaveError(msg);
       console.error("Failed to save profile:", err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveKeys = async () => {
+    const keys: { anthropic_api_key?: string; linkup_api_key?: string } = {};
+    if (anthropicKey.trim()) keys.anthropic_api_key = anthropicKey.trim();
+    if (linkupKey.trim()) keys.linkup_api_key = linkupKey.trim();
+    if (!Object.keys(keys).length) return;
+    setSavingKeys(true);
+    setKeysSaved(false);
+    setKeysError("");
+    try {
+      await api.saveApiKeys(keys);
+      const updated = await api.getApiKeys();
+      setMaskedAnthropic(updated.anthropic_api_key);
+      setMaskedLinkup(updated.linkup_api_key);
+      setAnthropicKey("");
+      setLinkupKey("");
+      setKeysSaved(true);
+      setTimeout(() => setKeysSaved(false), 2000);
+    } catch (err) {
+      setKeysError(err instanceof Error ? err.message : "Failed to save keys");
+    } finally {
+      setSavingKeys(false);
+    }
+  };
+
+  const handleClearKeys = async () => {
+    try {
+      await api.deleteApiKeys();
+      setMaskedAnthropic(null);
+      setMaskedLinkup(null);
+      setAnthropicKey("");
+      setLinkupKey("");
+    } catch (err) {
+      setKeysError(err instanceof Error ? err.message : "Failed to clear keys");
     }
   };
 
@@ -98,6 +164,12 @@ export default function Onboard() {
           </button>
         </div>
       </div>
+
+      {saveError && (
+        <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
+          {saveError}
+        </div>
+      )}
 
       {/* Company Profile */}
       <section className="flex flex-col gap-4">
@@ -205,6 +277,87 @@ export default function Onboard() {
                 This helps our AI understand your core offering.
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* API Keys (BYOK) */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="size-6 rounded bg-grey-100 text-grey-600 flex items-center justify-center">
+            <span className="material-symbols-outlined text-[16px]">key</span>
+          </div>
+          <h2 className="text-lg font-bold text-slate-800">API Keys</h2>
+        </div>
+        <div className="clay-card rounded-2xl p-6 md:p-8">
+          <p className="text-sm text-slate-500 mb-6">
+            Bring your own API keys to power the AI features. Keys are encrypted
+            at rest and never shared.
+          </p>
+
+          {keysError && (
+            <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm mb-6">
+              {keysError}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                Anthropic API Key
+              </label>
+              <input
+                type="password"
+                value={anthropicKey}
+                onChange={(e) => setAnthropicKey(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400"
+                placeholder={maskedAnthropic || "sk-ant-..."}
+              />
+              {maskedAnthropic && (
+                <p className="mt-1.5 text-xs text-green-600">
+                  Saved: {maskedAnthropic}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                LinkUp API Key
+              </label>
+              <input
+                type="password"
+                value={linkupKey}
+                onChange={(e) => setLinkupKey(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 text-slate-900 px-4 py-2.5 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all placeholder:text-slate-400"
+                placeholder={maskedLinkup || "Your LinkUp API key"}
+              />
+              {maskedLinkup && (
+                <p className="mt-1.5 text-xs text-green-600">
+                  Saved: {maskedLinkup}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={handleSaveKeys}
+              disabled={savingKeys || (!anthropicKey.trim() && !linkupKey.trim())}
+              className="px-5 py-2.5 rounded-lg bg-slate-900 text-white font-medium text-sm hover:opacity-90 transition-all shadow-md flex items-center gap-2 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {keysSaved ? "check_circle" : "save"}
+              </span>
+              {savingKeys ? "Saving..." : keysSaved ? "Saved!" : "Save Keys"}
+            </button>
+            {(maskedAnthropic || maskedLinkup) && (
+              <button
+                onClick={handleClearKeys}
+                className="px-5 py-2.5 rounded-lg border border-red-200 bg-white text-red-600 font-medium text-sm hover:bg-red-50 transition-colors shadow-sm flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                Clear Keys
+              </button>
+            )}
           </div>
         </div>
       </section>
